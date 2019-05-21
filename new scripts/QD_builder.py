@@ -52,6 +52,22 @@ def crystal_builder(structure, a, atom_a, atom_b, diameter, filename):
                         for item in bound:
                             atom_dict[item]["bound"].append(id)
                         id += 1
+    # Remove all singly bound atoms, if wanted
+    include_singles = input("Include singly bound atoms? y/n: ")
+    if include_singles == 'n':
+        while True:
+            for test_id, values in atom_dict.items():
+                stopped = False
+                # Delete singly bonded atoms, update neighbour
+                if len(values['bound']) == 1:
+                    neighbour = values['bound'][0]
+                    atom_dict[neighbour]['bound'].remove(test_id)
+                    del dict[test_id]
+                    stopped = True
+                    break
+            # Break if no singly bonded atoms remain
+            if not stopped:
+                break
     return atom_dict
 
 
@@ -210,22 +226,6 @@ def tetra_sites(dict):
     # Create a standard tetrahedron to determine sites
     x = 1 / math.sqrt(3)
     sites = {}
-    # First remove all singly bound atoms, if wanted
-    include_singles = input("Include singly bound atoms? y/n: ")
-    if include_singles == 'n':
-        while True:
-            for id, values in dict.items():
-                stopped = False
-                # Delete singly bonded atoms, update neighbour
-                if len(values['bound']) == 1:
-                    neighbour = values['bound'][0]
-                    dict[neighbour]['bound'].remove(id)
-                    del dict[id]
-                    stopped = True
-                    break
-            # Break if no singly bonded atoms remain
-            if not stopped:
-                break
     # Determine possible sites atom by atom
     for id, values in dict.items():
         if len(values['bound']) < 4:
