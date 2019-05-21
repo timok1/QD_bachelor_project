@@ -341,12 +341,14 @@ def bridges(atom_dict, sites):
 
 
 def prep_ligand_file(atom_dict, ligand_type, loc_id, extension):
+    """Read ligand file, possibly extend with another ligand and add to an object"""
+
     path = "../Ligands/" + ligand_type
     file = open(path, 'r')
     id = 0
     line_number = 0
     lig = ligands.empty_lig()
-
+    # Get element of atom connected to crystal
     for line in file:
         if line_number >= 2:
             values_list = line.split()
@@ -354,8 +356,9 @@ def prep_ligand_file(atom_dict, ligand_type, loc_id, extension):
                 base_element = values_list[0]
                 break
         line_number += 1
-
     initial_length = getattr(bond_dis, base_element)().distances[atom_dict[loc_id]["element"]]
+
+    # Add elements in file to dict
     line_number = 0
     file.seek(0)
     for line in file:
@@ -374,22 +377,27 @@ def prep_ligand_file(atom_dict, ligand_type, loc_id, extension):
             id += 1
         line_number += 1
 
+    # Extend ligand if needed
     if extension is not False and ligand_type != "H.xyz":
         path_ext = "../Ligands/" + extension
         file_ext = open(path_ext, 'r')
         line_number = 0
+        # Maybe use this later
         random_rotation = random.random() * 2 * math.pi * 0
         rep = lig.atoms[max(lig.atoms)]
         rep_coor = [rep["x"], rep["y"], rep["z"]]
         min_dist = math.inf
         ext = {}
+        # Check for atom to connect extension to
         for atom, values in lig.atoms.items():
             dist = hf.distance_checker(rep_coor, [values['x'], values['y'], values['z']])
             if dist < min_dist and dist != 0:
                 min_dist = dist
                 closest_atom = values
+        # Remove last atom
         del lig.atoms[max(lig.atoms)]
 
+        # Get correct rotations for extension
         unit_v = hf.normaliser([c1 - c2 for c1, c2 in zip(rep_coor, [closest_atom['x'], closest_atom['y'], closest_atom['z']])])
         angle = hf.angle_checker(unit_v, [0, 0, 1])
         axis = np.cross(unit_v, [0, 0, 1])
@@ -397,12 +405,12 @@ def prep_ligand_file(atom_dict, ligand_type, loc_id, extension):
             axis = [1, 0, 0]
         rot_mat1 = hf.rotation_matrix([0, 0, 1], random_rotation)
         rot_mat2 = hf.rotation_matrix(axis, angle)
-
         # test for correct angle
         test_v = np.dot(rot_mat2, unit_v)
         if round(np.dot(test_v, unit_v), 2) != 1:
             rot_mat2 = hf.rotation_matrix(axis, -angle)
 
+        # Find atom of extension to connect to ligand
         for line in file_ext:
             if line_number >= 2:
                 values_list = line.split()
@@ -413,6 +421,8 @@ def prep_ligand_file(atom_dict, ligand_type, loc_id, extension):
                     file_ext.seek(0)
                     break
             line_number += 1
+
+        # Add all atoms in extension to ligand
         for line in file_ext:
             if line_number == 0:
                 n_atoms_ext = int(float(line.strip()))
@@ -440,7 +450,7 @@ def place_ligands(atom_dict, sites, n_ligands, ligand_type, extension, final_lig
     original_ligand = ligand_type
     j = 0
     tried = []
-    print("\nPlacing " + ligand_type)
+    print("\nPlacing " + ligand_type[:-4])
     while j < n_ligands:
         # preventive in case of rounding errors
         if len(sites) == 0:
@@ -455,6 +465,7 @@ def place_ligands(atom_dict, sites, n_ligands, ligand_type, extension, final_lig
         if len(remaining_sites) == 0:
             print("\nUnable to place more ligands of type " + str(original_ligand) + ". Placed " + str(j) + " out of " + str(n_ligands) + " requested ligands. Continuing with other types.\n")
             break
+        # Use predetermined sites
         if loc_dict:
             if len(loc_dict[ligand_type]) == 0:
                 break
@@ -462,6 +473,7 @@ def place_ligands(atom_dict, sites, n_ligands, ligand_type, extension, final_lig
             loc = loc_dict[ligand_type][loc_id]
             del loc_dict[ligand_type][loc_id]
             loc_sites = sites[loc_id]['sites_xyz'].copy()
+        # Use random sites
         else:
             loc_id = random.choice(remaining_sites)
             loc_sites = sites[loc_id]['sites_xyz'].copy()
@@ -504,7 +516,8 @@ def place_ligands(atom_dict, sites, n_ligands, ligand_type, extension, final_lig
                                     "type": "ligand",
                                     "ligand_type": ligand_type,
                                     "loc_id": loc_id,
-                                    "loc": loc
+                                    "loc": loc,
+                                    "rotation": random_rotation + extra_rotation
                                     }
                     xyz_list.append(atom_xyz)
                     id += 1
