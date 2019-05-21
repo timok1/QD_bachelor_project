@@ -103,7 +103,7 @@ def crystal_reader(filename):
     return atom_dict
 
 
-def builder(atom_dict, filename, standard):
+def builder(atom_dict, filename):
     sites = tetra_sites(atom_dict)
     n_sites = len(sites)
 
@@ -112,50 +112,52 @@ def builder(atom_dict, filename, standard):
     coverage_list = []
     n_ligands_list = []
     extension_list = []
-    if standard == "n":
-        while True:
-            ligand_file = input("Filename of ligand to be added, or type files to see available ligands: ") + ".xyz"
-            if ligand_file[:-4] == "files":
-                lig_list = os.listdir("../Ligands")
-                print()
-                for ligs in lig_list:
-                    print(ligs[:-4])
-                print()
-                ligand_file = input("Filename of ligand to be added: ") + ".xyz"
-            ligand_types.append(ligand_file)
-            extend = input("Extend ligand? Note: this replaces the last atom in the ligand file. y/n: ")
-            if extend == "y":
-                extension_list.append(input("Extend with: ") + ".xyz")
-            else:
-                extension_list.append(False)
-            coverage = float(input("Coverage (fraction): "))
-            coverage_list.append(coverage)
-            n_ligands_list.append(round(coverage * n_sites))
-            more = input("Add another type? y/n: ")
-            if more == 'n':
-                final_ligand = "H.xyz"
-                extension_list.append(False)
-                break
-        space = 2
-    else:
-        ligand_types = ["C2H5.xyz"]
-        coverage = 0.5
-        coverage_list = [0.5]
+    lig_dict = {}
+    i = 0
+    while True:
+        ligand_file = input("Filename of ligand to be added, or type files to see available ligands: ") + ".xyz"
+        # Print available ligands
+        if ligand_file[:-4] == "files":
+            lig_list = os.listdir("../Ligands")
+            print()
+            for ligs in lig_list:
+                print(ligs[:-4])
+            print()
+            ligand_file = input("Filename of ligand to be added: ") + ".xyz"
+        ligand_types.append(ligand_file)
+        extend = input("Extend ligand? Note: this replaces the last atom in the ligand file. y/n: ")
+        if extend == "y":
+            extension_list.append(input("Extend with: ") + ".xyz")
+        else:
+            extension_list.append(False)
+        coverage = float(input("Coverage (fraction): "))
+        coverage_list.append(coverage)
         n_ligands_list.append(round(coverage * n_sites))
-        final_ligand = "H.xyz"
-        space = 1.8
-        extension_list = [False]
+        lig_dict[i] = {
+                "ligand_type": ligand_file,
+                "extension": extension_list[-1],
+                "coverage": coverage,
+                "n_ligands": round(coverage * n_sites)
+        }
+        i += 1
+        more = input("Add another type? y/n: ")
+        if more == 'n':
+            lig_dict[i] = {
+                    "ligand_type": "H.xyz",
+                    "extension": False,
+                    "coverage": 1,
+                    "n_ligands": n_sites
+            }
+            break
+    space = 2
 
     # Copy sites to use again later
     sites_copy = sites.copy()
     bridge_bool = input("Allow bridges (work in progress)? y/n: ")
     if bridge_bool == "y":
         atom_dict = bridges(atom_dict, sites)
-    for i in range(len(ligand_types)):
-        atom_dict = place_ligands(atom_dict, sites, n_ligands_list[i], ligand_types[i], extension_list[i], final_ligand, space, False)
-    # Place final ligands at remaining sites
-    n_ligands = len(sites)
-    atom_dict = place_ligands(atom_dict, sites, n_ligands, final_ligand, extension_list[-1], final_ligand, space, False)
+    for ligand, values in lig_dict.items():
+        atom_dict = place_ligands(atom_dict, values, sites, space, False)
 
     # Write atoms to file
     dict2file(atom_dict, filename)
@@ -171,6 +173,7 @@ def builder(atom_dict, filename, standard):
 
 # Replace ligands in QD with new ligands
 def replace_ligands(atom_dict, ligand_types, sites, n_ligands_list):
+    """Still need to fix lig_dict here"""
     filename = input("Write to file: ")
     replacement_list = []
     rep_ext_list = []
@@ -195,7 +198,10 @@ def replace_ligands(atom_dict, ligand_types, sites, n_ligands_list):
             if values["ligand_type"] != "H.xyz":
                 if values["loc_id"] not in loc_dict[values["ligand_type"]]["loc_id"]:
                     loc_dict[values['ligand_type']]["loc_id"].append(values["loc_id"])
-                    rep_dict[loc_dict[values['ligand_type']]["replacement"]][values["loc_id"]] = values["loc"]
+                    rep_dict[loc_dict[values['ligand_type']]["replacement"]][values["loc_id"]] = {
+                                                                                            "loc": values["loc"],
+                                                                                            "rotation": values["rotation"]
+                                                                                        }
     for item in atom_del_list:
         del atom_dict[item]
     print(rep_dict)
@@ -444,7 +450,11 @@ def prep_ligand_file(atom_dict, ligand_type, loc_id, extension):
 
 
 # Randomly choose a site to place ligand
-def place_ligands(atom_dict, sites, n_ligands, ligand_type, extension, final_ligand, space, loc_dict):
+def place_ligands(atom_dict, lig_info, sites, space, loc_dict):
+    ligand_type = lig_info["ligand_type"]
+    n_ligands = lig_info["n_ligands"]
+    extension = lig_info["extension"]
+    final_ligand = 'H.xyz'
     buffer = 0.5
     id = max(atom_dict) + 1
     original_ligand = ligand_type
@@ -455,7 +465,6 @@ def place_ligands(atom_dict, sites, n_ligands, ligand_type, extension, final_lig
         # preventive in case of rounding errors
         if len(sites) == 0:
             break
-        random_rotation = random.random() * 2 * math.pi
         extra_rotation = 0
         ligand_type = original_ligand
 
@@ -470,14 +479,16 @@ def place_ligands(atom_dict, sites, n_ligands, ligand_type, extension, final_lig
             if len(loc_dict[ligand_type]) == 0:
                 break
             loc_id = random.choice(list(loc_dict[ligand_type]))
-            loc = loc_dict[ligand_type][loc_id]
-            del loc_dict[ligand_type][loc_id]
+            loc = loc_dict[ligand_type][loc_id]["loc"]
             loc_sites = sites[loc_id]['sites_xyz'].copy()
+            random_rotation = loc_dict[ligand_type][loc_id]["rotation"]
+            del loc_dict[ligand_type][loc_id]
         # Use random sites
         else:
             loc_id = random.choice(remaining_sites)
             loc_sites = sites[loc_id]['sites_xyz'].copy()
             loc = random.choice(loc_sites)
+            random_rotation = random.random() * 2 * math.pi
         loc_primary_xyz = sites[loc_id]['primary_xyz']
         tried_loc = []
 
@@ -688,27 +699,17 @@ def place_bridge_ligands(atom_dict, sites, bridge_dict, bridge_ligand):
 
 
 if __name__ == "__main__":
-    standard = input("Standard? y/n: ")
-    if standard == "n":
-        build = input("Create new crystal (y) or use existing file (n)?: ")
-        if build == "y":
-            structure = input("Specify structure type: ")
-            a = float(input("Specify lattice constant (in Ångström): "))
-            atom_a = input("Element for first element type: ")
-            atom_b = input("Element for second element type: ")
-            diameter = float(input("Diameter of quantum dot (in unit cells): "))
-            filename = input("Write to file: ")
-            atom_dict = crystal_builder(structure, a, atom_a, atom_b, diameter, filename)
-        else:
-            crystal_file = input("Crystal file to use (don't write the file extension): ") + ".xyz"
-            filename = input("Write to file: ")
-            atom_dict = crystal_reader(crystal_file)
-    else:
-        structure = "zns"
-        a = 5.431
-        atom_a = "Si"
-        atom_b = "Si"
-        diameter = 4
-        filename = "test"
+    build = input("Create new crystal (y) or use existing file (n)?: ")
+    if build == "y":
+        structure = input("Specify structure type: ")
+        a = float(input("Specify lattice constant (in Ångström): "))
+        atom_a = input("Element for first element type: ")
+        atom_b = input("Element for second element type: ")
+        diameter = float(input("Diameter of quantum dot (in unit cells): "))
+        filename = input("Write to file: ")
         atom_dict = crystal_builder(structure, a, atom_a, atom_b, diameter, filename)
-    builder(atom_dict, filename, standard)
+    else:
+        crystal_file = input("Crystal file to use (don't write the file extension): ") + ".xyz"
+        filename = input("Write to file: ")
+        atom_dict = crystal_reader(crystal_file)
+    builder(atom_dict, filename)
