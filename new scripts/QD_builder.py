@@ -5,6 +5,7 @@ import math
 import random
 import bonding_distances as bond_dis
 import os
+import helper_functions as hf
 
 
 # Build crystal with input
@@ -250,7 +251,7 @@ def tetra_sites(dict):
                 sec_xyz_rel = [dict[secondary]['x'] - primary_xyz[0],
                                dict[secondary]['y'] - primary_xyz[1],
                                dict[secondary]['z'] - primary_xyz[2]]
-                sec_xyz_rel = normaliser(sec_xyz_rel)
+                sec_xyz_rel = hf.normaliser(sec_xyz_rel)
                 connection_list.append(sec_xyz_rel)
 
             # line up first vector
@@ -261,8 +262,8 @@ def tetra_sites(dict):
                 if round(np.dot(tetrahedron[0], connection_list[0]), 2) == -1:
                     angle = math.pi
             else:
-                angle = angle_checker(tetrahedron[0], connection_list[0])
-            rot_mat = rotation_matrix(axis, angle)
+                angle = hf.angle_checker(tetrahedron[0], connection_list[0])
+            rot_mat = hf.rotation_matrix(axis, angle)
             for k in range(4):
                 tetrahedron[k] = list(np.dot(rot_mat, tetrahedron[k]))
 
@@ -271,7 +272,7 @@ def tetra_sites(dict):
             # Random rotation if single bond, and skip to next atom
             if len(connection_list) == 1:
                 angle = random.random() * 2 * math.pi
-                rot_mat = rotation_matrix(axis, angle)
+                rot_mat = hf.rotation_matrix(axis, angle)
                 for k in range(4):
                     tetrahedron[k] = list(np.around(np.array(np.dot(rot_mat, tetrahedron[k])), 4))
                 sites[id] = {
@@ -285,10 +286,10 @@ def tetra_sites(dict):
             else:
                 normal_1 = np.cross(tetrahedron[0], connection_list[1])
                 normal_2 = np.cross(tetrahedron[0], tetrahedron[1])
-                angle = angle_checker(normal_1, normal_2)
+                angle = hf.angle_checker(normal_1, normal_2)
 
             # Make sure rotation is in right direction
-            test_rot_mat = rotation_matrix(axis, angle)
+            test_rot_mat = hf.rotation_matrix(axis, angle)
             testrahedron = tetrahedron.copy()
             for test in range(4):
                 testrahedron[test] = list(np.dot(test_rot_mat, tetrahedron[test]))
@@ -296,7 +297,7 @@ def tetra_sites(dict):
                 angle = -angle
 
             # Rotate tetrahedron to correct orientation, add points without atom to sites
-            rot_mat = rotation_matrix(axis, angle)
+            rot_mat = hf.rotation_matrix(axis, angle)
             for k in range(4):
                 tetrahedron[k] = list(np.around(np.array(np.dot(rot_mat, tetrahedron[k])), 4))
             if len(values['bound']) == 2:
@@ -325,7 +326,7 @@ def bridges(atom_dict, sites):
             if secondary_site != primary_site:
                 for xyz1 in values_prim["sites_xyz"]:
                     for xyz2 in values_sec["sites_xyz"]:
-                        dist = distance_checker([c1 + c2 for c1, c2 in zip(values_prim["primary_xyz"], xyz1)], [c1 + c2 for c1, c2 in zip(values_sec["primary_xyz"], xyz2)])
+                        dist = hf.distance_checker([c1 + c2 for c1, c2 in zip(values_prim["primary_xyz"], xyz1)], [c1 + c2 for c1, c2 in zip(values_sec["primary_xyz"], xyz2)])
                         if dist < 2.5:
                             couples.append([primary_site, secondary_site])
                             coor1 = values_prim["primary_xyz"]
@@ -333,7 +334,7 @@ def bridges(atom_dict, sites):
                             new_loc = [(c1 + c2) / 2 for c1, c2 in zip(coor1, coor2)]
                             temp_xyz = [(c1 + c2) / 2 for c1, c2 in zip(xyz1, xyz2)]
                             new_site = [(c1 - c2) for c1, c2 in zip(temp_xyz, new_loc)]
-                            temp_xyz = normaliser(temp_xyz)
+                            temp_xyz = hf.normaliser(temp_xyz)
                             if new_site not in tried:
                                 bridge_dict[bridge_id] = {
                                                         "primary_xyz": new_loc,
@@ -350,23 +351,6 @@ def bridges(atom_dict, sites):
         del bridge_dict[cut]
     atom_dict = place_bridge_ligands(atom_dict, sites, bridge_dict, bridge_ligand)
     return atom_dict
-
-
-def rotation_matrix(axis, theta):
-    """
-    Return the rotation matrix associated with counterclockwise rotation about
-    the given axis by theta radians. Taken from
-    https://stackoverflow.com/questions/6802577/rotation-of-3d-vector
-    """
-    axis = np.asarray(axis)
-    axis = axis / math.sqrt(np.dot(axis, axis))
-    a = math.cos(theta / 2.0)
-    b, c, d = -axis * math.sin(theta / 2.0)
-    aa, bb, cc, dd = a * a, b * b, c * c, d * d
-    bc, ad, ac, ab, bd, cd = b * c, a * d, a * c, a * b, b * d, c * d
-    return np.array([[aa + bb - cc - dd, 2 * (bc + ad), 2 * (bd - ac)],
-                     [2 * (bc - ad), aa + cc - bb - dd, 2 * (cd + ab)],
-                     [2 * (bd + ac), 2 * (cd - ab), aa + dd - bb - cc]])
 
 
 def prep_ligand_file(atom_dict, ligand_type, loc_id, extension):
@@ -412,19 +396,19 @@ def prep_ligand_file(atom_dict, ligand_type, loc_id, extension):
         min_dist = math.inf
         ext = {}
         for atom, values in lig.atoms.items():
-            dist = distance_checker(rep_coor, [values['x'], values['y'], values['z']])
+            dist = hf.distance_checker(rep_coor, [values['x'], values['y'], values['z']])
             if dist < min_dist and dist != 0:
                 min_dist = dist
                 closest_atom = values
         del lig.atoms[max(lig.atoms)]
 
-        unit_v = normaliser([c1 - c2 for c1, c2 in zip(rep_coor, [closest_atom['x'], closest_atom['y'], closest_atom['z']])])
-        angle = angle_checker(unit_v, [0, 0, 1])
+        unit_v = hf.normaliser([c1 - c2 for c1, c2 in zip(rep_coor, [closest_atom['x'], closest_atom['y'], closest_atom['z']])])
+        angle = hf.angle_checker(unit_v, [0, 0, 1])
         axis = np.cross(unit_v, [0, 0, 1])
         if round(np.linalg.norm(axis), 2) == 0:
             axis = [1, 0, 0]
-        rot_mat1 = rotation_matrix([0, 0, 1], random_rotation)
-        rot_mat2 = rotation_matrix(axis, angle)
+        rot_mat1 = hf.rotation_matrix([0, 0, 1], random_rotation)
+        rot_mat2 = hf.rotation_matrix(axis, angle)
 
         for line in file_ext:
             if line_number >= 2:
@@ -502,8 +486,8 @@ def place_ligands(atom_dict, sites, n_ligands, ligand_type, extension, final_lig
                 axis = [1, 0, 0]
                 angle = 0
             else:
-                angle = -angle_checker(loc, [0, 0, 1])
-            rot_mat = rotation_matrix(axis, angle)
+                angle = -hf.angle_checker(loc, [0, 0, 1])
+            rot_mat = hf.rotation_matrix(axis, angle)
 
             # Place ligand if possible, otherwise rotate
             while True:
@@ -514,7 +498,7 @@ def place_ligands(atom_dict, sites, n_ligands, ligand_type, extension, final_lig
 
                 for atom in lig.atoms:
                     # Rotate every atom in ligand according to random_rotation
-                    rotated_atom = np.dot(rotation_matrix([0, 0, 1], random_rotation + extra_rotation), [lig.atoms[atom]['x'], lig.atoms[atom]['y'], lig.atoms[atom]['z']])
+                    rotated_atom = np.dot(hf.rotation_matrix([0, 0, 1], random_rotation + extra_rotation), [lig.atoms[atom]['x'], lig.atoms[atom]['y'], lig.atoms[atom]['z']])
                     # Rotate in right direction
                     new_v = np.dot(rot_mat, rotated_atom)
                     atom_xyz = [c1 + c2 for c1, c2 in zip(new_v, loc_primary_xyz)]
@@ -539,7 +523,7 @@ def place_ligands(atom_dict, sites, n_ligands, ligand_type, extension, final_lig
                             except KeyError:
                                 space2 = float(input("Bond length between " + str(atom_element) + " and " + str(values["element"]) + " not available. Enter manually: ")) + buffer
                             if test_atom != loc_id:
-                                dist = distance_checker([values['x'], values['y'], values['z']], xyz_list[-1])
+                                dist = hf.distance_checker([values['x'], values['y'], values['z']], xyz_list[-1])
                                 if dist < space2:
                                     broken = True
                                     break
@@ -552,7 +536,7 @@ def place_ligands(atom_dict, sites, n_ligands, ligand_type, extension, final_lig
                             min_dist_lig = math.inf
                             for test_lig, values in atom_dict.items():
                                 if values["type"] == "ligand":
-                                    dist = distance_checker([values['x'], values['y'], values['z']], [c1 + c2 for c1, c2 in zip(new_pos, loc_primary_xyz)])
+                                    dist = hf.distance_checker([values['x'], values['y'], values['z']], [c1 + c2 for c1, c2 in zip(new_pos, loc_primary_xyz)])
                                     bond_len_loc = getattr(bond_dis, atom_element)().distances[values["element"]]
                                     if dist < bond_len_loc + 0.3:
                                         if dist < min_dist_lig:
@@ -576,7 +560,7 @@ def place_ligands(atom_dict, sites, n_ligands, ligand_type, extension, final_lig
                             vec_closest_element = [c1 - c2 for c1, c2 in zip(min_dist_lig_coor, loc_primary_xyz)]
                             axis = np.cross(vec_closest_element, new_pos)
                             angle = 0.1
-                            rot_mat = rotation_matrix(axis, angle)
+                            rot_mat = hf.rotation_matrix(axis, angle)
                             new_pos = np.dot(rot_mat, new_pos.copy())
 
                     if broken:
@@ -641,8 +625,8 @@ def place_bridge_ligands(atom_dict, sites, bridge_dict, bridge_ligand):
             else:
                 angle = math.pi
         else:
-            angle = -angle_checker(values["sites_xyz"], [0, 0, 1])
-        rot_mat = rotation_matrix(axis, angle)
+            angle = -hf.angle_checker(values["sites_xyz"], [0, 0, 1])
+        rot_mat = hf.rotation_matrix(axis, angle)
         if values["connected"][0] in sites:
             del sites[values["connected"][0]]
         if values["connected"][1] in sites:
@@ -655,14 +639,14 @@ def place_bridge_ligands(atom_dict, sites, bridge_dict, bridge_ligand):
             test_vz_rot = np.dot(rot_mat, [0, 0, 1])
             uhh = [atom_dict[values["connected"][0]]["x"], atom_dict[values["connected"][0]]["y"], atom_dict[values["connected"][0]]["z"]]
             new_ding = [c1 - c2 for c1, c2 in zip(uhh, values["primary_xyz"])]
-            new_ding = normaliser(new_ding)
+            new_ding = hf.normaliser(new_ding)
             normal_1 = np.cross(test_vx_rot, test_vz_rot)
             normal_2 = np.cross(new_ding, test_vz_rot)
-            angle2 = angle_checker(normal_1, normal_2)
+            angle2 = hf.angle_checker(normal_1, normal_2)
             random_rotation = math.pi / 2 - angle2
-            vars2 = np.dot(rotation_matrix([0, 0, 1], random_rotation), test_vx)
+            vars2 = np.dot(hf.rotation_matrix([0, 0, 1], random_rotation), test_vx)
             vars3 = np.dot(rot_mat, vars2)
-            angle3 = round(angle_checker(vars3, normal_2), 3)
+            angle3 = round(hf.angle_checker(vars3, normal_2), 3)
             if angle3 != 0 and angle3 != round(math.pi, 3):
                 random_rotation = random_rotation + math.pi / 2
             random_rotation = random_rotation + random.choice((0, math.pi))
@@ -670,7 +654,7 @@ def place_bridge_ligands(atom_dict, sites, bridge_dict, bridge_ligand):
             # Rotate every atom in ligand according to random_rotation
             for atom in lig.atoms:
                 new_v_temp = np.dot(rot_mat, [lig.atoms[atom]['x'], lig.atoms[atom]['y'], lig.atoms[atom]['z']])
-                new_v = np.dot(rotation_matrix(np.dot(rot_mat, [0, 0, 1]), random_rotation), new_v_temp)
+                new_v = np.dot(hf.rotation_matrix(np.dot(rot_mat, [0, 0, 1]), random_rotation), new_v_temp)
                 atom_xyz = [c1 + c2 for c1, c2 in zip(new_v, values["primary_xyz"])]
                 atom_element = lig.atoms[atom]['element']
                 temp_atom_dict[id] = {
@@ -689,31 +673,12 @@ def place_bridge_ligands(atom_dict, sites, bridge_dict, bridge_ligand):
                     if values2['type'] == "crystal":
                         space2 = space2 + 0.25
                     if test_atom not in values["connected"]:
-                        dist = distance_checker([values2['x'], values2['y'], values2['z']], xyz_list[-1])
+                        dist = hf.distance_checker([values2['x'], values2['y'], values2['z']], xyz_list[-1])
                         if dist < space2 + 0.25:
                             break
             atom_dict = {**atom_dict, **temp_atom_dict}
             break
     return atom_dict
-
-
-def distance_checker(xyz1, xyz2):
-    return math.sqrt((xyz1[0] - xyz2[0])**2 + (xyz1[1] - xyz2[1])**2 +
-                     (xyz1[2] - xyz2[2])**2)
-
-
-def normaliser(vec):
-    norm = np.linalg.norm(vec)
-    for i in range(len(vec)):
-        vec[i] = vec[i] / norm
-    return vec
-
-
-def angle_checker(vec1, vec2):
-    vec1 = normaliser(vec1)
-    vec2 = normaliser(vec2)
-    angle = np.arccos(np.clip(np.dot(vec1, vec2), -1, 1))
-    return angle
 
 
 if __name__ == "__main__":
