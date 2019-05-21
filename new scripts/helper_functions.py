@@ -39,3 +39,13 @@ def rotation_matrix(axis, theta):
     return np.array([[aa + bb - cc - dd, 2 * (bc + ad), 2 * (bd - ac)],
                      [2 * (bc - ad), aa + cc - bb - dd, 2 * (cd + ab)],
                      [2 * (bd + ac), 2 * (cd - ab), aa + dd - bb - cc]])
+
+
+def bond_checker(atom, dict, bond_range):
+    "Check for all atoms in bonding range"
+    bound = []
+    for item, values in dict.items():
+        if (math.sqrt((atom[1] - values['x'])**2 + (atom[2] - values['y'])**2 +
+                      (atom[3] - values['z'])**2) <= bond_range):
+            bound.append(item)
+    return bound

@@ -39,7 +39,7 @@ def crystal_builder(structure, a, atom_a, atom_b, diameter, filename):
                             abs(atom_y) + abs(atom_z) <= boundary_110) and (abs(atom_x) <= boundary_100
                             and abs(atom_y) <= boundary_100 and abs(atom_z) <= boundary_100)):
                         all_atoms.append(atom_details)
-                        bound = bond_checker(atom_details, atom_dict, bond_range)
+                        bound = hf.bond_checker(atom_details, atom_dict, bond_range)
                         atom_dict[id] = {
                                         "x": atom_x,
                                         "y": atom_y,
@@ -57,7 +57,7 @@ def crystal_builder(structure, a, atom_a, atom_b, diameter, filename):
 
 # Read xyz-file and place atoms in a dict.
 def crystal_reader(filename):
-    file = open(filename, 'r')
+    file = open("../SiQD/" + filename, 'r')
     id = 0
     atom_dict = {}
     # Calculate this later
@@ -71,7 +71,7 @@ def crystal_reader(filename):
             values_list = line.split()
             for i in range(1, 4):
                 values_list[i] = float(values_list[i])
-            bound = bond_checker(values_list, atom_dict, bond_range)
+            bound = hf.bond_checker(values_list, atom_dict, bond_range)
             atom_dict[id] = {
                             "x": values_list[1],
                             "y": values_list[2],
@@ -142,15 +142,7 @@ def builder(atom_dict, filename, standard):
     atom_dict = place_ligands(atom_dict, sites, n_ligands, final_ligand, extension_list[-1], final_ligand, space, False)
 
     # Write atoms to file
-    file = open(filename + ".xyz", "w")
-    file.write("        \n\n")
-    for atom, values in atom_dict.items():
-        file.write(values['element'] + "\t" + str(values['x']) + "\t\t" +
-                   str(values['y']) + "\t\t" + str(values['z']) + "\n")
-    file.seek(0)
-    file.write(str(len(atom_dict)))
-    file.close()
-    print("\nQuantum Dot created :)")
+    dict2file(atom_dict, filename)
 
     # Replace ligands to create new QD
     while True:
@@ -197,25 +189,20 @@ def replace_ligands(atom_dict, ligand_types, sites, n_ligands_list):
         atom_dict = place_ligands(atom_dict, sites, n_ligands_list[i], replacement_list[i], rep_ext_list[i], "H", 2, rep_dict)
     n_sites = len(sites)
     atom_dict = place_ligands(atom_dict, sites, n_sites, "H.xyz", False, "H", 2, False)
-    file = open(filename + ".xyz", "w")
+
+    dict2file(atom_dict, filename)
+
+
+def dict2file(dict, filename):
+    file = open("../Created_QD/" + filename + ".xyz", "w")
     file.write("        \n\n")
-    for atom, values in atom_dict.items():
+    for atom, values in dict.items():
         file.write(values['element'] + "\t" + str(values['x']) + "\t\t" +
                    str(values['y']) + "\t\t" + str(values['z']) + "\n")
     file.seek(0)
-    file.write(str(len(atom_dict)))
+    file.write(str(len(dict)))
     file.close()
     print("\nQuantum Dot created :)")
-
-
-# Add all atoms that are in 'bonding range' to list
-def bond_checker(atom, dict, bond_range):
-    bound = []
-    for item, values in dict.items():
-        if (math.sqrt((atom[1] - values['x'])**2 + (atom[2] - values['y'])**2 +
-                      (atom[3] - values['z'])**2) <= bond_range):
-            bound.append(item)
-    return bound
 
 
 # Calculate all sites for ligands for tetrahedral structure
@@ -386,6 +373,7 @@ def prep_ligand_file(atom_dict, ligand_type, loc_id, extension):
                         }
             id += 1
         line_number += 1
+
     if extension is not False and ligand_type != "H.xyz":
         path_ext = "../Ligands/" + extension
         file_ext = open(path_ext, 'r')
@@ -409,6 +397,11 @@ def prep_ligand_file(atom_dict, ligand_type, loc_id, extension):
             axis = [1, 0, 0]
         rot_mat1 = hf.rotation_matrix([0, 0, 1], random_rotation)
         rot_mat2 = hf.rotation_matrix(axis, angle)
+
+        # test for correct angle
+        test_v = np.dot(rot_mat2, unit_v)
+        if round(np.dot(test_v, unit_v), 2) != 1:
+            rot_mat2 = hf.rotation_matrix(axis, -angle)
 
         for line in file_ext:
             if line_number >= 2:
