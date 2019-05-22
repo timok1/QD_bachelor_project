@@ -6,6 +6,7 @@ import random
 import bonding_distances as bond_dis
 import os
 import helper_functions as hf
+import copy
 
 
 # Build crystal with input
@@ -166,51 +167,66 @@ def builder(atom_dict, filename):
     while True:
         replacement_ligands = input("Replace ligands to create new quantum dot? y/n: ")
         if replacement_ligands == 'y':
-            replace_ligands(atom_dict, ligand_types, sites_copy, n_ligands_list)
+            replace_ligands(atom_dict, lig_dict, sites_copy)
         else:
             break
 
 
 # Replace ligands in QD with new ligands
-def replace_ligands(atom_dict, ligand_types, sites, n_ligands_list):
+def replace_ligands(atom_dict, lig_dict, sites):
     """Still need to fix lig_dict here"""
     filename = input("Write to file: ")
     replacement_list = []
     rep_ext_list = []
     loc_dict = {"H": []}
-    rep_dict = {}
-    for ligand in ligand_types:
-        replacement_list.append(input("Replace " + ligand + " with: ") + ".xyz")
-        loc_dict[ligand] = {
-                            "loc_id": [],
-                            "replacement": replacement_list[-1]
-                        }
-        rep_dict[replacement_list[-1]] = {}
-        extend = input("Extend ligand? y/n: ")
-        if extend == "y":
-            rep_ext_list.append(input("Extend with: ") + ".xyz")
-        else:
-            rep_ext_list.append(False)
+    rep_dict = copy.deepcopy(lig_dict)
+    lig_dict_inv = {}
+    for ligand, lig_val in lig_dict.items():
+        if lig_val["ligand_type"] != "H.xyz":
+            replacement_list.append(input("Replace " + lig_val["ligand_type"] + " with: ") + ".xyz")
+            loc_dict[ligand] = {
+                                "loc_id": [],
+                                "replacement": replacement_list[-1]
+                            }
+            rep_dict[ligand]["ligand_type"] = replacement_list[-1]
+            rep_dict[ligand]["loc_info"] = {}
+
+            lig_dict_inv[lig_val["ligand_type"]] = ligand
+            extend = input("Extend ligand? y/n: ")
+            if extend == "y":
+                rep_ext_list.append(input("Extend with: ") + ".xyz")
+                rep_dict[ligand]["extension"] = rep_ext_list[-1]
+            else:
+                rep_ext_list.append(False)
+                rep_dict[ligand]["extension"] = False
+
     atom_del_list = []
-    for atom, values in atom_dict.items():
-        if values["type"] == 'ligand':
+    for atom, at_values in atom_dict.items():
+        if at_values["type"] == 'ligand':
             atom_del_list.append(atom)
-            if values["ligand_type"] != "H.xyz":
-                if values["loc_id"] not in loc_dict[values["ligand_type"]]["loc_id"]:
-                    loc_dict[values['ligand_type']]["loc_id"].append(values["loc_id"])
-                    rep_dict[loc_dict[values['ligand_type']]["replacement"]][values["loc_id"]] = {
-                                                                                            "loc": values["loc"],
-                                                                                            "rotation": values["rotation"]
-                                                                                        }
+            if at_values["ligand_type"] != "H.xyz":
+                rep_dict[lig_dict_inv[at_values["ligand_type"]]]["loc_info"][at_values["loc_id"]] = {
+                    "loc": at_values["loc"],
+                    "rotation": at_values["rotation"]
+                }
+
+                #
+                # if at_values["loc_id"] not in loc_dict[at_values["ligand_type"]]["loc_id"]:
+                #     loc_dict[at_values['ligand_type']]["loc_id"].append(at_values["loc_id"])
+                #     rep_dict[loc_dict[at_values['ligand_type']]["replacement"]][values["loc_id"]] = {
+                #                                                                             "loc": at_values["loc"],
+                #                                                                             "rotation": at_values["rotation"]
+                #                                                                         }
     for item in atom_del_list:
         del atom_dict[item]
-    print(rep_dict)
-    i = 0
 
-    for i in range(len(replacement_list)):
-        atom_dict = place_ligands(atom_dict, sites, n_ligands_list[i], replacement_list[i], rep_ext_list[i], "H", 2, rep_dict)
-    n_sites = len(sites)
-    atom_dict = place_ligands(atom_dict, sites, n_sites, "H.xyz", False, "H", 2, False)
+    for lig, values in rep_dict.items():
+        atom_dict = place_ligands(atom_dict, values, sites, 2, True)
+
+    # for i in range(len(replacement_list)):
+    #     atom_dict = place_ligands(atom_dict, sites, n_ligands_list[i], replacement_list[i], rep_ext_list[i], "H", 2, rep_dict)
+    # n_sites = len(sites)
+    # atom_dict = place_ligands(atom_dict, sites, n_sites, "H.xyz", False, "H", 2, False)
 
     dict2file(atom_dict, filename)
 
@@ -450,7 +466,7 @@ def prep_ligand_file(atom_dict, ligand_type, loc_id, extension):
 
 
 # Randomly choose a site to place ligand
-def place_ligands(atom_dict, lig_info, sites, space, loc_dict):
+def place_ligands(atom_dict, lig_info, sites, space, fixed_loc):
     ligand_type = lig_info["ligand_type"]
     n_ligands = lig_info["n_ligands"]
     extension = lig_info["extension"]
@@ -475,14 +491,14 @@ def place_ligands(atom_dict, lig_info, sites, space, loc_dict):
             print("\nUnable to place more ligands of type " + str(original_ligand) + ". Placed " + str(j) + " out of " + str(n_ligands) + " requested ligands. Continuing with other types.\n")
             break
         # Use predetermined sites
-        if loc_dict:
-            if len(loc_dict[ligand_type]) == 0:
+        if fixed_loc and ligand_type != "H.xyz":
+            if len(lig_info["loc_info"]) == 0:
                 break
-            loc_id = random.choice(list(loc_dict[ligand_type]))
-            loc = loc_dict[ligand_type][loc_id]["loc"]
+            loc_id = random.choice(list(lig_info["loc_info"]))
+            loc = lig_info["loc_info"][loc_id]["loc"]
             loc_sites = sites[loc_id]['sites_xyz'].copy()
-            random_rotation = loc_dict[ligand_type][loc_id]["rotation"]
-            del loc_dict[ligand_type][loc_id]
+            random_rotation = lig_info["loc_info"][loc_id]["rotation"]
+            del lig_info["loc_info"][loc_id]
         # Use random sites
         else:
             loc_id = random.choice(remaining_sites)
