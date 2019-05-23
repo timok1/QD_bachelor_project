@@ -75,6 +75,13 @@ def crystal_builder(structure, a, atom_a, atom_b, diameter, filename):
 # Read xyz-file and place atoms in a dict.
 def crystal_reader(filename):
     file = open("../SiQD/" + filename, 'r')
+    element_list = []
+    while True:
+        el = input("Type element in crystal, or type 'done': ")
+        if el == 'done':
+            break
+        element_list.append(el)
+
     id = 0
     atom_dict = {}
     # Calculate this later
@@ -89,13 +96,17 @@ def crystal_reader(filename):
             for i in range(1, 4):
                 values_list[i] = float(values_list[i])
             bound = hf.bond_checker(values_list, atom_dict, bond_range)
+            if values_list[0] in element_list:
+                type = "crystal"
+            else:
+                type = "ligand"
             atom_dict[id] = {
                             "x": values_list[1],
                             "y": values_list[2],
                             "z": values_list[3],
                             "element": values_list[0],
                             "bound": bound,
-                            "type": "crystal"
+                            "type": type
                             }
             for item in bound:
                 atom_dict[item]["bound"].append(id)
@@ -159,7 +170,6 @@ def builder(atom_dict, filename):
         atom_dict = bridges(atom_dict, sites)
     for ligand, values in lig_dict.items():
         atom_dict = place_ligands(atom_dict, values, sites, space, False)
-
     # Write atoms to file
     dict2file(atom_dict, filename)
 
@@ -244,7 +254,7 @@ def tetra_sites(dict):
     sites = {}
     # Determine possible sites atom by atom
     for id, values in dict.items():
-        if len(values['bound']) < 4:
+        if len(values['bound']) < 4 and values["type"] == "crystal":
             sites[id] = {}
             tetrahedron = [[x, x, x], [x, -x, -x], [-x, x, -x], [-x, -x, x]]
             primary_xyz = [values['x'], values['y'], values['z']]
@@ -647,12 +657,11 @@ def place_bridge_ligands(atom_dict, sites, bridge_dict, bridge_ligand):
         random_rotation = math.pi/4
         # Determine height of ligand. If bonding distance is too short, set to 0.
         # This is only correct for crystal with one kind of atom
+        lig = prep_ligand_file(atom_dict, "/DB_Ligands/" + bridge_ligand + ".xyz", False)
         try:
-            initial_length = math.sqrt(getattr(bond_dis, "C")().distances["Si"]**2 - (3.84/2)**2)
+            initial_length = math.sqrt(getattr(bond_dis, lig.base_element)().distances["Si"]**2 - (3.84/2)**2)
         except ValueError:
             initial_length = 0
-        lig_object = getattr(ligands, bridge_ligand)
-        lig = lig_object(initial_length)
         # Get correct rotation for ligand relative to site
         axis = np.cross(values["sites_xyz"], [0, 0, 1])
         # Prevent dividing by 0 when vectors are already lined up
@@ -701,7 +710,7 @@ def place_bridge_ligands(atom_dict, sites, bridge_dict, bridge_ligand):
                                 "z": atom_xyz[2],
                                 "element": atom_element,
                                 "type": "ligand",
-                                "ligand_type": ligand_type
+                                "ligand_type": bridge_ligand
                                 }
                 xyz_list.append(atom_xyz)
                 id += 1
