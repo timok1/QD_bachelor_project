@@ -21,7 +21,6 @@ def crystal_builder(structure, a, atom_a, atom_b, diameter, filename):
     boundary_111 = 3.0 / math.sqrt(3) * cut_off_distance
     boundary_110 = 2.0 / math.sqrt(2) * cut_off_distance
     boundary_100 = cut_off_distance
-    bond_range = getattr(bond_dis, atom_a)().distances[atom_b] + 0.1
     id = 0
     for x in n_range:
         for y in n_range:
@@ -40,7 +39,7 @@ def crystal_builder(structure, a, atom_a, atom_b, diameter, filename):
                             abs(atom_y) + abs(atom_z) <= boundary_110) and (abs(atom_x) <= boundary_100
                             and abs(atom_y) <= boundary_100 and abs(atom_z) <= boundary_100)):
                         all_atoms.append(atom_details)
-                        bound = hf.bond_checker(atom_details, atom_dict, bond_range)
+                        bound = hf.bond_checker(atom_details, atom_dict)
                         atom_dict[id] = {
                                         "x": atom_x,
                                         "y": atom_y,
@@ -85,7 +84,6 @@ def crystal_reader(filename):
     id = 0
     atom_dict = {}
     # Calculate this later
-    bond_range = 3
     line_number = 0
     for line in file:
         if line_number == 0:
@@ -95,7 +93,7 @@ def crystal_reader(filename):
             values_list = line.split()
             for i in range(1, 4):
                 values_list[i] = float(values_list[i])
-            bound = hf.bond_checker(values_list, atom_dict, bond_range)
+            bound = hf.bond_checker(values_list, atom_dict)
             if values_list[0] in element_list:
                 type = "crystal"
             else:

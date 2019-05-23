@@ -1,5 +1,6 @@
 import math
 import numpy as np
+import bonding_distances as bond_dis
 
 
 def distance_checker(xyz1, xyz2):
@@ -41,10 +42,11 @@ def rotation_matrix(axis, theta):
                      [2 * (bd + ac), 2 * (cd - ab), aa + dd - bb - cc]])
 
 
-def bond_checker(atom, dict, bond_range):
+def bond_checker(atom, dict):
     "Check for all atoms in bonding range"
     bound = []
     for item, values in dict.items():
+        bond_range = getattr(bond_dis, atom[0])().distances[values["element"]] + 0.1
         if (math.sqrt((atom[1] - values['x'])**2 + (atom[2] - values['y'])**2 +
                       (atom[3] - values['z'])**2) <= bond_range):
             bound.append(item)
