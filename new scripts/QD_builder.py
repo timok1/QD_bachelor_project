@@ -167,7 +167,10 @@ def builder(atom_dict, filename):
     while True:
         replacement_ligands = input("Replace ligands to create new quantum dot? y/n: ")
         if replacement_ligands == 'y':
-            replace_ligands(atom_dict, lig_dict, sites_copy)
+            sites = sites_copy.copy()
+            replaced = replace_ligands(atom_dict, lig_dict, sites)
+            atom_dict = replaced[0]
+            lig_dict = replaced[1]
         else:
             break
 
@@ -175,6 +178,7 @@ def builder(atom_dict, filename):
 # Replace ligands in QD with new ligands
 def replace_ligands(atom_dict, lig_dict, sites):
     """Still need to fix lig_dict here"""
+    print(lig_dict)
     filename = input("Write to file: ")
     replacement_list = []
     rep_ext_list = []
@@ -210,25 +214,15 @@ def replace_ligands(atom_dict, lig_dict, sites):
                     "rotation": at_values["rotation"]
                 }
 
-                #
-                # if at_values["loc_id"] not in loc_dict[at_values["ligand_type"]]["loc_id"]:
-                #     loc_dict[at_values['ligand_type']]["loc_id"].append(at_values["loc_id"])
-                #     rep_dict[loc_dict[at_values['ligand_type']]["replacement"]][values["loc_id"]] = {
-                #                                                                             "loc": at_values["loc"],
-                #                                                                             "rotation": at_values["rotation"]
-                #                                                                         }
     for item in atom_del_list:
         del atom_dict[item]
 
     for lig, values in rep_dict.items():
         atom_dict = place_ligands(atom_dict, values, sites, 2, True)
 
-    # for i in range(len(replacement_list)):
-    #     atom_dict = place_ligands(atom_dict, sites, n_ligands_list[i], replacement_list[i], rep_ext_list[i], "H", 2, rep_dict)
-    # n_sites = len(sites)
-    # atom_dict = place_ligands(atom_dict, sites, n_sites, "H.xyz", False, "H", 2, False)
-
     dict2file(atom_dict, filename)
+
+    return atom_dict, rep_dict
 
 
 def dict2file(dict, filename):
@@ -362,7 +356,7 @@ def bridges(atom_dict, sites):
     return atom_dict
 
 
-def prep_ligand_file(atom_dict, ligand_type, loc_id, extension):
+def prep_ligand_file(atom_dict, ligand_type, extension):
     """Read ligand file, possibly extend with another ligand and add to an object"""
 
     path = "../Ligands/" + ligand_type
@@ -375,10 +369,9 @@ def prep_ligand_file(atom_dict, ligand_type, loc_id, extension):
         if line_number >= 2:
             values_list = line.split()
             if float(values_list[1]) == float(values_list[2]) == float(values_list[3]) == 0:
-                base_element = values_list[0]
+                lig.base_element = values_list[0]
                 break
         line_number += 1
-    initial_length = getattr(bond_dis, base_element)().distances[atom_dict[loc_id]["element"]]
 
     # Add elements in file to dict
     line_number = 0
@@ -393,7 +386,7 @@ def prep_ligand_file(atom_dict, ligand_type, loc_id, extension):
             lig.atoms[id] = {
                             "x": float(values_list[1]),
                             "y": float(values_list[2]),
-                            "z": float(values_list[3]) + initial_length,
+                            "z": float(values_list[3]),
                             "element": values_list[0]
                         }
             id += 1
@@ -471,6 +464,7 @@ def place_ligands(atom_dict, lig_info, sites, space, fixed_loc):
     n_ligands = lig_info["n_ligands"]
     extension = lig_info["extension"]
     final_ligand = 'H.xyz'
+    fail_bool = False
     buffer = 0.5
     id = max(atom_dict) + 1
     original_ligand = ligand_type
@@ -507,10 +501,11 @@ def place_ligands(atom_dict, lig_info, sites, space, fixed_loc):
             random_rotation = random.random() * 2 * math.pi
         loc_primary_xyz = sites[loc_id]['primary_xyz']
         tried_loc = []
+        lig = prep_ligand_file(atom_dict, ligand_type, extension)
 
         # Loop over every site connected to chosen atom
         while loc not in tried_loc:
-            lig = prep_ligand_file(atom_dict, ligand_type, loc_id, extension)
+            # lig = prep_ligand_file(atom_dict, ligand_type, loc_id, extension)
             # Get correct rotation for ligand relative to site
             axis = np.cross(loc, [0, 0, 1])
             # Prevent dividing by 0 when vectors are already lined up
@@ -527,10 +522,11 @@ def place_ligands(atom_dict, lig_info, sites, space, fixed_loc):
                 temp_atom_dict = {}
                 broken = False
                 min_dist_lig = math.inf
+                initial_length = getattr(bond_dis, lig.base_element)().distances[atom_dict[loc_id]["element"]]
 
                 for atom in lig.atoms:
                     # Rotate every atom in ligand according to random_rotation
-                    rotated_atom = np.dot(hf.rotation_matrix([0, 0, 1], random_rotation + extra_rotation), [lig.atoms[atom]['x'], lig.atoms[atom]['y'], lig.atoms[atom]['z']])
+                    rotated_atom = np.dot(hf.rotation_matrix([0, 0, 1], random_rotation + extra_rotation), [lig.atoms[atom]['x'], lig.atoms[atom]['y'], lig.atoms[atom]['z'] + initial_length])
                     # Rotate in right direction
                     new_v = np.dot(rot_mat, rotated_atom)
                     atom_xyz = [c1 + c2 for c1, c2 in zip(new_v, loc_primary_xyz)]
@@ -602,13 +598,18 @@ def place_ligands(atom_dict, lig_info, sites, space, fixed_loc):
                 if ligand_type != final_ligand:
                     # Rotate if there is a collision
                     if broken and extra_rotation < math.pi * 2:
-                        extra_rotation += 0.2
+                        # Rotate less with fixed loc
+                        if fixed_loc:
+                            extra_rotation += 0.1
+                        else:
+                            extra_rotation += 0.2
                         continue
                     # break if rotated fully
                     elif extra_rotation > math.pi * 2:
                         extra_rotation = 0
                         tried.append(loc_id)
                         tried_loc.append(loc)
+                        fail_bool = True
                         print("fail")
                         break
                     # Merge dicts if no collision
@@ -620,6 +621,7 @@ def place_ligands(atom_dict, lig_info, sites, space, fixed_loc):
                             del sites[loc_id]
                         tried_loc = [loc]
                         ligand_type = final_ligand
+                        lig = prep_ligand_file(atom_dict, "H.xyz", False)
                         j += 1
                         break
                 else:
@@ -630,6 +632,9 @@ def place_ligands(atom_dict, lig_info, sites, space, fixed_loc):
                     break
             # Add final ligand type to remaining sites at chosen atom
             loc = loc_sites[(loc_sites.index(loc) + 1) % len(loc_sites)]
+
+    if fixed_loc and fail_bool:
+        print("Not all ligands were able to be put in the same spot")
 
     return atom_dict
 
