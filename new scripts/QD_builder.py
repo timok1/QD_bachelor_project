@@ -196,7 +196,10 @@ def builder(atom_dict):
     for ligand, values in lig_dict.items():
         atom_dict = place_ligands(atom_dict, values, sites, buffer, False)
     # Write atoms to file
-    dict2file(atom_dict, filename)
+    if series_b == 'y':
+        dict2file(atom_dict, filename + base_list[0][:-4] + "+" + ext_list[0][:-4])
+    else:
+        dict2file(atom_dict, filename)
 
     # Replace ligands to create new QD
     if series_b == 'y':
@@ -208,7 +211,7 @@ def builder(atom_dict):
                     continue
                 sites = sites_copy.copy()
                 inp_rep = [bas, ext]
-                filename_rep = filename + bas[:-4] + "+" + ext[:-4] + datetime.now().strftime('_%Y%m%d_%H_%M_%S')
+                filename_rep = filename + bas[:-4] + "+" + ext[:-4]
                 replaced = replace_ligands(atom_dict, lig_dict, sites, buffer, inp_rep, filename_rep)
                 atom_dict = replaced[0]
                 lig_dict = replaced[1]
@@ -268,7 +271,6 @@ def replace_ligands(atom_dict, lig_dict, sites, buffer, inp_rep, filename):
 
     for item in atom_del_list:
         del atom_dict[item]
-    print("it's all good")
     for lig, values in rep_dict.items():
         atom_dict = place_ligands(atom_dict, values, sites, buffer, True)
 
@@ -278,8 +280,8 @@ def replace_ligands(atom_dict, lig_dict, sites, buffer, inp_rep, filename):
 
 
 def dict2file(dict, filename):
-    if not os.path.exists("../Created_QD/" + filename + ".xyz"):
-        os.makedirs("../Created_QD/" + filename)
+    if not os.path.exists("../Created_QD/" + filename.partition("/")[0] + "/"):
+        os.makedirs("../Created_QD/" + filename.partition("/")[0] + "/")
     file = open("../Created_QD/" + filename + ".xyz", "w")
     file.write("        \n\n")
     for atom, values in dict.items():
