@@ -7,7 +7,7 @@ import bonding_distances as bond_dis
 import os
 import helper_functions as hf
 import copy
-from datetime import datetime
+import sys
 
 
 # Build crystal with input
@@ -235,6 +235,7 @@ def replace_ligands(atom_dict, lig_dict, sites, buffer, inp_rep, filename):
     loc_dict = {"H": []}
     rep_dict = copy.deepcopy(lig_dict)
     lig_dict_inv = {}
+    buffer = 0.5
     for ligand, lig_val in lig_dict.items():
         if lig_val["ligand_type"] != "H.xyz":
             if inp_rep:
@@ -484,7 +485,6 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc):
     extension = lig_info["extension"]
     final_ligand = 'H.xyz'
     fail_bool = False
-    buffer = 1
     id = max(atom_dict) + 1
     original_ligand = ligand_type
     j = 0
@@ -628,7 +628,6 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc):
                         tried.append(loc_id)
                         tried_loc.append(loc)
                         fail_bool = True
-                        print("fail")
                         break
                     # Merge dicts if no collision
                     elif not broken:
@@ -652,7 +651,9 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc):
             loc = loc_sites[(loc_sites.index(loc) + 1) % len(loc_sites)]
 
     if fixed_loc and fail_bool:
-        print("Not all ligands were able to be put in the same spot")
+        cont = input("Not all ligands were able to be put in the same spot, continue anyway? y/n:")
+        if cont == 'n':
+            sys.exit()
 
     return atom_dict
 
