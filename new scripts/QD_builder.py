@@ -235,7 +235,7 @@ def replace_ligands(atom_dict, lig_dict, sites, buffer, inp_rep, filename):
     loc_dict = {"H": []}
     rep_dict = copy.deepcopy(lig_dict)
     lig_dict_inv = {}
-    buffer = 0.5
+    buffer = 0.7
     for ligand, lig_val in lig_dict.items():
         if lig_val["ligand_type"] != "H.xyz":
             if inp_rep:
@@ -269,11 +269,22 @@ def replace_ligands(atom_dict, lig_dict, sites, buffer, inp_rep, filename):
                     "loc": at_values["loc"],
                     "rotation": at_values["rotation"]
                 }
-
-    for item in atom_del_list:
-        del atom_dict[item]
-    for lig, values in rep_dict.items():
-        atom_dict = place_ligands(atom_dict, values, sites, buffer, True)
+    rep_dict_copy = copy.deepcopy(rep_dict)
+    atom_dict_copy = copy.deepcopy(atom_dict)
+    sites_copy = copy.deepcopy(sites)
+    done = False
+    while not done:
+        for item in atom_del_list:
+            del atom_dict[item]
+        for lig, values in rep_dict.items():
+            atom_dict = place_ligands(atom_dict, values, sites, buffer, True)
+            if atom_dict == 1:
+                atom_dict = copy.deepcopy(atom_dict_copy)
+                sites = copy.deepcopy(sites_copy)
+                rep_dict = copy.deepcopy(rep_dict_copy)
+                break
+            else:
+                done = True
 
     dict2file(atom_dict, filename)
 
@@ -648,10 +659,26 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc):
                     tried_loc.append(loc)
                     break
             # Add final ligand type to remaining sites at chosen atom
-            loc = loc_sites[(loc_sites.index(loc) + 1) % len(loc_sites)]
+            try:
+                loc = loc_sites[(loc_sites.index(loc) + 1) % len(loc_sites)]
+            except ValueError:
+                min_dist = math.inf
+                loc_index = 0
+                for item in loc_sites:
+                    distance = hf.distance_checker(loc, item)
+                    if distance < min_dist:
+                        min_dist = distance
+                        loc_index_min = loc_index
+                    loc_index += 1
+                loc = loc_sites[(loc_index_min + 1) % len(loc_sites)]
 
     if fixed_loc and fail_bool:
-        cont = input("Not all ligands were able to be put in the same spot, continue anyway? y/n:")
+        retry = input("Not all ligands were able to be put in the same spot, try again? y/n: ")
+        if retry == 'y':
+            print("Trying again...")
+            return 1
+        else:
+            cont = input("Continue with fewer ligands? y/n:")
         if cont == 'n':
             sys.exit()
 
