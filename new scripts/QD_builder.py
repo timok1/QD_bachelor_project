@@ -198,8 +198,19 @@ def builder(atom_dict):
     bridge_bool = False #input("Allow bridges (work in progress)? y/n: ")
     if bridge_bool:
         atom_dict = bridges(atom_dict, sites)
-    for ligand, values in lig_dict.items():
-        atom_dict = place_ligands(atom_dict, values, sites, buffer, False)
+
+    atom_dict_copy = copy.deepcopy(atom_dict)
+    while True:
+        stopped = False
+        for ligand, values in lig_dict.items():
+            atom_dict = place_ligands(atom_dict, values, sites, buffer, False)
+            if atom_dict == 1:
+                atom_dict = copy.deepcopy(atom_dict_copy)
+                sites = copy.deepcopy(sites_copy)
+                stopped = True
+                break
+        if not stopped:
+            break
     # Write atoms to file
     if series_b:
         dict2file(atom_dict, filename + base_list[0][:-4] + "+" + ext_list[0][:-4])
@@ -518,6 +529,10 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc):
         remaining_sites = [x for x in sites_list if x not in tried]
         if len(remaining_sites) == 0:
             print("\nUnable to place more ligands of type " + str(original_ligand) + ". Placed " + str(j) + " out of " + str(n_ligands) + " requested ligands. Continuing with other types.\n")
+            retry = hf.y2true(input("Fail, try again? y/n: "))
+            if retry:
+                print("Trying again...")
+                return 1
             break
         # Use predetermined sites
         if fixed_loc and ligand_type != "H.xyz":
@@ -677,6 +692,7 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc):
                     loc_index += 1
                 loc = loc_sites[(loc_index_min + 1) % len(loc_sites)]
 
+    # Detect failure to place all requested ligands if replacing
     if fixed_loc and fail_bool:
         retry = hf.y2true(input("Not all ligands were able to be put in the same spot, try again? y/n: "))
         if retry:
