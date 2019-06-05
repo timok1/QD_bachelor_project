@@ -51,3 +51,13 @@ def bond_checker(atom, dict):
                       (atom[3] - values['z'])**2) <= bond_range):
             bound.append(item)
     return bound
+
+
+def y2true(text):
+    while True:
+        if text == 'y':
+            return True
+        elif text == 'n':
+            return False
+        else:
+            text = input("Wrong input, try again: ")

@@ -54,8 +54,8 @@ def crystal_builder(structure, a, atom_a, atom_b, diameter):
                             atom_dict[item]["bound"].append(id)
                         id += 1
     # Remove all singly bound atoms, if wanted
-    include_singles = input("Include singly bound atoms? y/n: ")
-    if include_singles == 'n':
+    include_singles = hf.y2true(input("Include singly bound atoms? y/n: "))
+    if not include_singles:
         while True:
             for test_id, values in atom_dict.items():
                 stopped = False
@@ -126,20 +126,21 @@ def builder(atom_dict):
     lig_dict = {}
     i = 0
 
-    series_b = input("Add a series of ligands (y), or add them one by one(n)?: ")
+    # Get a series of ligands to add to crystal
+    series_b = hf.y2true(input("Add a series of ligands (y), or add them one by one(n)?: "))
     base_list = []
     ext_list = []
-    if series_b == 'y':
+    if series_b:
         while True:
-            base = input("Add ligand to base list, or type 'done': ") + ".xyz"
-            if base == 'done.xyz':
+            base = input("Add ligand to base list, or type 'done': ")
+            if base == 'done':
                 break
-            base_list.append(base)
+            base_list.append(base + ".xyz")
         while True:
-            ext = input("Add extension to extension list, or type 'done': ") + ".xyz"
-            if ext == 'done.xyz':
+            ext = input("Add extension to extension list, or type 'done': ")
+            if ext == 'done':
                 break
-            ext_list.append(ext)
+            ext_list.append(ext + ".xyz")
         coverage = float(input("Coverage (fraction): "))
         lig_dict[0] = {
                 "ligand_type": base_list[0],
@@ -148,6 +149,7 @@ def builder(atom_dict):
                 "n_ligands": round(coverage * n_sites)
         }
 
+    # Add ligands one by one
     else:
         while True:
             ligand_file = input("Filename of ligand to be added, or type files to see available ligands: ") + ".xyz"
@@ -162,8 +164,8 @@ def builder(atom_dict):
                 print()
                 ligand_file = input("Filename of ligand to be added: ") + ".xyz"
             ligand_types.append(ligand_file)
-            extend = input("Extend ligand? Note: this replaces the last atom in the ligand file. y/n: ")
-            if extend == "y":
+            extend = hf.y2true(input("Extend ligand? Note: this replaces the last atom in the ligand file. y/n: "))
+            if extend:
                 extension_list.append(input("Extend with: ") + ".xyz")
             else:
                 extension_list.append(False)
@@ -177,8 +179,8 @@ def builder(atom_dict):
                     "n_ligands": round(coverage * n_sites)
             }
             i += 1
-            more = input("Add another type? y/n: ")
-            if more == 'n':
+            more = hf.y2true(input("Add another type? y/n: "))
+            if not more:
                 lig_dict[i] = {
                         "ligand_type": "H.xyz",
                         "extension": False,
@@ -187,22 +189,26 @@ def builder(atom_dict):
                 }
                 break
     buffer = float(input("Buffer size (Angstrom)? Distance between ligands will be at least bonding length + buffer: "))
+    if series_b:
+        sec_buffer = buffer
+        buffer = float(input("Initial buffer (Buffer for first QD. Helps create space for later QD's): "))
 
     # Copy sites to use again later
-    sites_copy = sites.copy()
+    sites_copy = copy.deepcopy(sites)
     bridge_bool = False #input("Allow bridges (work in progress)? y/n: ")
-    if bridge_bool == "y":
+    if bridge_bool:
         atom_dict = bridges(atom_dict, sites)
     for ligand, values in lig_dict.items():
         atom_dict = place_ligands(atom_dict, values, sites, buffer, False)
     # Write atoms to file
-    if series_b == 'y':
+    if series_b:
         dict2file(atom_dict, filename + base_list[0][:-4] + "+" + ext_list[0][:-4])
     else:
         dict2file(atom_dict, filename)
 
     # Replace ligands to create new QD
-    if series_b == 'y':
+    if series_b:
+        buffer = sec_buffer
         count = 0
         for bas in base_list:
             for ext in ext_list:
@@ -217,8 +223,8 @@ def builder(atom_dict):
                 lig_dict = replaced[1]
 
     while True:
-        replacement_ligands = input("Replace ligands to create new quantum dot? y/n: ")
-        if replacement_ligands == 'y':
+        replacement_ligands = hf.y2true(input("Replace ligands to create new quantum dot? y/n: "))
+        if replacement_ligands:
             sites = sites_copy.copy()
             filename_rep = input("Write to file: ")
             replaced = replace_ligands(atom_dict, lig_dict, sites, buffer, False, filename_rep)
@@ -235,7 +241,6 @@ def replace_ligands(atom_dict, lig_dict, sites, buffer, inp_rep, filename):
     loc_dict = {"H": []}
     rep_dict = copy.deepcopy(lig_dict)
     lig_dict_inv = {}
-    buffer = 0.7
     for ligand, lig_val in lig_dict.items():
         if lig_val["ligand_type"] != "H.xyz":
             if inp_rep:
@@ -244,8 +249,8 @@ def replace_ligands(atom_dict, lig_dict, sites, buffer, inp_rep, filename):
                 rep_dict[ligand]["extension"] = rep_ext_list[-1]
             else:
                 replacement_list.append(input("Replace " + lig_val["ligand_type"] + " with: ") + ".xyz")
-                extend = input("Extend ligand? y/n: ")
-                if extend == "y":
+                extend = hf.y2true(input("Extend ligand? y/n: "))
+                if extend:
                     rep_ext_list.append(input("Extend with: ") + ".xyz")
                     rep_dict[ligand]["extension"] = rep_ext_list[-1]
                 else:
@@ -673,13 +678,13 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc):
                 loc = loc_sites[(loc_index_min + 1) % len(loc_sites)]
 
     if fixed_loc and fail_bool:
-        retry = input("Not all ligands were able to be put in the same spot, try again? y/n: ")
-        if retry == 'y':
+        retry = hf.y2true(input("Not all ligands were able to be put in the same spot, try again? y/n: "))
+        if retry:
             print("Trying again...")
             return 1
         else:
-            cont = input("Continue with fewer ligands? y/n:")
-        if cont == 'n':
+            cont = hf.y2true(input("Continue with fewer ligands? y/n:"))
+        if not cont:
             sys.exit()
 
     return atom_dict
@@ -802,8 +807,8 @@ def place_bridge_ligands(atom_dict, sites, bridge_dict, bridge_ligand):
 
 
 if __name__ == "__main__":
-    build = input("Create new crystal (y) or use existing file (n)?: ")
-    if build == "y":
+    build = hf.y2true(input("Create new crystal (y) or use existing file (n)?: "))
+    if build:
         structure = input("Specify structure type: ")
         a = float(input("Specify lattice constant (in Ångström): "))
         atom_a = input("Element for first element type: ")
