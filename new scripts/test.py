@@ -1,7 +1,8 @@
 
+l = 1
+j = 1.5
+s = 0.5
 
-if 2 == 1:
-    x = True
 
-if x:
-    print("yay")
+g = 1 + (j*(j+1) - l * (l + 1) + s * (s+1))/(2*j*(j+1))
+print(g)

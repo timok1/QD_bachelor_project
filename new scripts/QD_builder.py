@@ -181,8 +181,9 @@ def builder(atom_dict):
             i += 1
             more = hf.y2true(input("Add another type? y/n: "))
             if not more:
+                cap = input("Cap remaining sites with (single atom): ") + ".xyz"
                 lig_dict[i] = {
-                        "ligand_type": "H.xyz",
+                        "ligand_type": cap,
                         "extension": False,
                         "coverage": 1,
                         "n_ligands": n_sites
@@ -200,10 +201,11 @@ def builder(atom_dict):
         atom_dict = bridges(atom_dict, sites)
 
     atom_dict_copy = copy.deepcopy(atom_dict)
+    # lig_dict_copy = copy.deepcopy(lig_dict)
     while True:
         stopped = False
         for ligand, values in lig_dict.items():
-            atom_dict = place_ligands(atom_dict, values, sites, buffer, False)
+            atom_dict = place_ligands(atom_dict, values, sites, buffer, False, cap)
             if atom_dict == 1:
                 atom_dict = copy.deepcopy(atom_dict_copy)
                 sites = copy.deepcopy(sites_copy)
@@ -226,12 +228,15 @@ def builder(atom_dict):
                 if count == 0:
                     count += 1
                     continue
+                # atom_dict = copy.deepcopy(atom_dict_copy)
+                # lig_dict = copy.deepcopy(lig_dict_copy)
                 sites = sites_copy.copy()
                 inp_rep = [bas, ext]
                 filename_rep = filename + bas[:-4] + "+" + ext[:-4]
                 replaced = replace_ligands(atom_dict, lig_dict, sites, buffer, inp_rep, filename_rep)
                 atom_dict = replaced[0]
                 lig_dict = replaced[1]
+
 
     while True:
         replacement_ligands = hf.y2true(input("Replace ligands to create new quantum dot? y/n: "))
@@ -506,17 +511,19 @@ def prep_ligand_file(atom_dict, ligand_type, extension):
 
 
 # Randomly choose a site to place ligand
-def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc):
+def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
     ligand_type = lig_info["ligand_type"]
     n_ligands = lig_info["n_ligands"]
     extension = lig_info["extension"]
-    final_ligand = 'H.xyz'
     fail_bool = False
     id = max(atom_dict) + 1
     original_ligand = ligand_type
     j = 0
     tried = []
-    print("\nPlacing " + ligand_type[:-4] + " + " + extension[:-4])
+    if extension:
+        print("\nPlacing " + ligand_type[:-4] + " + " + extension[:-4])
+    else:
+        print("\nPlacing " + ligand_type[:-4])
     while j < n_ligands:
         # preventive in case of rounding errors
         if len(sites) == 0:
@@ -594,7 +601,7 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc):
                     xyz_list.append(atom_xyz)
                     id += 1
                     # Check for overlap
-                    if ligand_type != final_ligand:
+                    if ligand_type != cap:
                         for test_atom, values in atom_dict.items():
                             try:
                                 space = getattr(bond_dis, atom_element)().distances[values["element"]] + buffer
@@ -607,7 +614,7 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc):
                                     break
                             if broken:
                                 break
-                    if ligand_type == final_ligand:
+                    if ligand_type == cap:
                         new_pos = new_v.copy()
                         changed = False
                         while True:
@@ -628,7 +635,7 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc):
                                                     "x": xyz_list[0],
                                                     "y": xyz_list[1],
                                                     "z": xyz_list[2],
-                                                    "element": "H",
+                                                    "element": atom_element,
                                                     "type": "ligand",
                                                     "ligand_type": ligand_type,
                                                     "loc_id": loc_id,
@@ -644,7 +651,7 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc):
                     if broken:
                         break
                 # Check for ligand collisions except when last ligand is added
-                if ligand_type != final_ligand:
+                if ligand_type != cap:
                     # Rotate if there is a collision
                     if broken and extra_rotation < math.pi * 2:
                         # Rotate less with fixed loc
@@ -668,7 +675,7 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc):
                         if loc_id in sites:
                             del sites[loc_id]
                         tried_loc = [loc]
-                        ligand_type = final_ligand
+                        ligand_type = cap
                         lig = prep_ligand_file(atom_dict, "H.xyz", False)
                         j += 1
                         break
@@ -699,7 +706,7 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc):
             print("Trying again...")
             return 1
         else:
-            cont = hf.y2true(input("Continue with fewer ligands? y/n:"))
+            cont = hf.y2true(input("Continue with fewer ligands? y/n: "))
         if not cont:
             sys.exit()
 

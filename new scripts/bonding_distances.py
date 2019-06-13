@@ -25,7 +25,7 @@ class C(object):
                     "W":	2.06,
                     "F":	1.34,
                     "Cl":	1.76,
-                    "Br":	1.93,
+                    "Br":	1.94,
                     "I":	2.13,
                     "Cd":   2.13,
                     "Na":   2.24
@@ -40,7 +40,8 @@ class H(object):
                     "F":    0.97,
                     "O":    0.96,
                     "N":    1.02,
-                    "Na":   1.97
+                    "Na":   1.97,
+                    "Br":   1.45
                     }
 
 class O(object):
@@ -52,7 +53,8 @@ class O(object):
                     "H":    0.96,
                     "N":    1.45,
                     "F":    1.41,
-                    "Na":   2.04
+                    "Na":   2.04,
+                    "Br":   1.80
                     }
 
 class F(object):
@@ -64,7 +66,8 @@ class F(object):
                     "Si":   1.59,
                     "O":    1.41,
                     "N":    1.37,
-                    "Na":   1.98
+                    "Na":   1.98,
+                    "Br":   1.85
                     }
 
 class Si(object):
@@ -76,7 +79,8 @@ class Si(object):
                     "F":    1.59,
                     "Si":   2.35,
                     "N":    1.70,
-                    "Na":   2.63
+                    "Na":   2.63,
+                    "Br":   2.21
                     }
 
 class N(object):
@@ -88,7 +92,8 @@ class N(object):
                     "Si":   1.70,
                     "O":    1.45,
                     "F":    1.37,
-                    "Na":   2.13
+                    "Na":   2.13,
+                    "Br":   1.85
         }
 
 class Na(object):
@@ -100,6 +105,19 @@ class Na(object):
                     "O":    2.04,
                     "F":    1.98,
                     "Na":   3.08,
-                    "Si":   2.63
+                    "Si":   2.63,
+                    "Br":   2.57
+        }
 
+class Br(object):
+    def __init__(self):
+        self.distances = {
+                    "H":    1.45,
+                    "C":    1.94,
+                    "N":    1.85,
+                    "O":    1.80,
+                    "F":    1.85,
+                    "Na":   2.57,
+                    "Si":   2.21,
+                    "Br":   2.30
         }
