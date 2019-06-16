@@ -28,7 +28,8 @@ class C(object):
                     "Br":	1.94,
                     "I":	2.13,
                     "Cd":   2.13,
-                    "Na":   2.24
+                    "Na":   2.24,
+                    "Ge":   1.94
                     }
 
 class H(object):
@@ -41,7 +42,8 @@ class H(object):
                     "O":    0.96,
                     "N":    1.02,
                     "Na":   1.97,
-                    "Br":   1.45
+                    "Br":   1.45,
+                    "Ge":   1.55
                     }
 
 class O(object):
@@ -54,7 +56,8 @@ class O(object):
                     "N":    1.45,
                     "F":    1.41,
                     "Na":   2.04,
-                    "Br":   1.80
+                    "Br":   1.80,
+                    "Ge":   1.79
                     }
 
 class F(object):
@@ -67,7 +70,8 @@ class F(object):
                     "O":    1.41,
                     "N":    1.37,
                     "Na":   1.98,
-                    "Br":   1.85
+                    "Br":   1.85,
+                    "Ge":   1.76
                     }
 
 class Si(object):
@@ -80,7 +84,8 @@ class Si(object):
                     "Si":   2.35,
                     "N":    1.70,
                     "Na":   2.63,
-                    "Br":   2.21
+                    "Br":   2.21,
+                    "Ge":   2.31
                     }
 
 class N(object):
@@ -93,7 +98,8 @@ class N(object):
                     "O":    1.45,
                     "F":    1.37,
                     "Na":   2.13,
-                    "Br":   1.85
+                    "Br":   1.85,
+                    "Ge":   1.87
         }
 
 class Na(object):
@@ -106,7 +112,8 @@ class Na(object):
                     "F":    1.98,
                     "Na":   3.08,
                     "Si":   2.63,
-                    "Br":   2.57
+                    "Br":   2.57,
+                    "Ge":   2.72
         }
 
 class Br(object):
@@ -119,5 +126,20 @@ class Br(object):
                     "F":    1.85,
                     "Na":   2.57,
                     "Si":   2.21,
-                    "Br":   2.30
+                    "Br":   2.30,
+                    "Ge":   2.33
+        }
+
+class Ge(object):
+    def __init__(self):
+        self.distances = {
+                    "H":    1.55,
+                    "C":    1.94,
+                    "N":    1.87,
+                    "O":    1.79,
+                    "F":    1.76,
+                    "Na":   2.72,
+                    "Si":   2.31,
+                    "Br":   2.33,
+                    "Ge":   2.39
         }

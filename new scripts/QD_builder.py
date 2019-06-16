@@ -12,6 +12,8 @@ import sys
 
 # Build crystal with input
 def crystal_builder(structure, a, atom_a, atom_b, diameter):
+    hf.dis_in_file(atom_a)
+    hf.dis_in_file(atom_b)
     n_unit = math.ceil(diameter)
     n_range = np.arange(-n_unit/2.0 + 0.5, n_unit/2.0)
     # Get unit cell
@@ -42,6 +44,7 @@ def crystal_builder(structure, a, atom_a, atom_b, diameter):
                         all_atoms.append(atom_details)
                         bound = hf.bond_checker(atom_details, atom_dict)
                         atom_dict[id] = {
+                                        "coor": [atom_x, atom_y, atom_z],
                                         "x": atom_x,
                                         "y": atom_y,
                                         "z": atom_z,
@@ -78,7 +81,9 @@ def crystal_reader(filename):
     element_list = []
     while True:
         el = input("Type element in crystal, or type 'done': ")
-        if el == 'done':
+        if el != 'done':
+            hf.dis_in_file(el)
+        else:
             break
         element_list.append(el)
 
@@ -99,13 +104,14 @@ def crystal_reader(filename):
             else:
                 type = "ligand"
             atom_dict[id] = {
-                            "x": values_list[1],
-                            "y": values_list[2],
-                            "z": values_list[3],
-                            "element": values_list[0],
-                            "bound": bound,
-                            "type": type
-                            }
+                        "coor": values_list[1:],
+                        "x": values_list[1],
+                        "y": values_list[2],
+                        "z": values_list[3],
+                        "element": values_list[0],
+                        "bound": bound,
+                        "type": type
+                        }
             for item in bound:
                 atom_dict[item]["bound"].append(id)
             id += 1
@@ -137,10 +143,13 @@ def builder(atom_dict):
                 break
             base_list.append(base + ".xyz")
         while True:
-            ext = input("Add extension to extension list, or type 'done': ")
+            ext = input("Add extension to extension list, or type 'none', or 'done': ")
             if ext == 'done':
                 break
-            ext_list.append(ext + ".xyz")
+            if ext == 'none':
+                ext_list.append(False)
+            else:
+                ext_list.append(ext + ".xyz")
         coverage = float(input("Coverage (fraction): "))
         lig_dict[0] = {
                 "ligand_type": base_list[0],
@@ -148,6 +157,13 @@ def builder(atom_dict):
                 "coverage": coverage,
                 "n_ligands": round(coverage * n_sites)
         }
+        cap = input("Cap remaining sites with (single atom): ") + ".xyz"
+        lig_dict[1] = {
+                "ligand_type": cap,
+                "extension": False,
+                "coverage": 1,
+                "n_ligands": n_sites
+            }
 
     # Add ligands one by one
     else:
@@ -205,6 +221,7 @@ def builder(atom_dict):
     while True:
         stopped = False
         for ligand, values in lig_dict.items():
+            print(values)
             atom_dict = place_ligands(atom_dict, values, sites, buffer, False, cap)
             if atom_dict == 1:
                 atom_dict = copy.deepcopy(atom_dict_copy)
@@ -233,7 +250,7 @@ def builder(atom_dict):
                 sites = sites_copy.copy()
                 inp_rep = [bas, ext]
                 filename_rep = filename + bas[:-4] + "+" + ext[:-4]
-                replaced = replace_ligands(atom_dict, lig_dict, sites, buffer, inp_rep, filename_rep)
+                replaced = replace_ligands(atom_dict, lig_dict, cap, sites, buffer, inp_rep, filename_rep)
                 atom_dict = replaced[0]
                 lig_dict = replaced[1]
 
@@ -243,7 +260,8 @@ def builder(atom_dict):
         if replacement_ligands:
             sites = sites_copy.copy()
             filename_rep = input("Write to file: ")
-            replaced = replace_ligands(atom_dict, lig_dict, sites, buffer, False, filename_rep)
+            buffer = float(input("Buffer: "))
+            replaced = replace_ligands(atom_dict, lig_dict, cap, sites, buffer, False, filename_rep)
             atom_dict = replaced[0]
             lig_dict = replaced[1]
         else:
@@ -251,14 +269,14 @@ def builder(atom_dict):
 
 
 # Replace ligands in QD with new ligands
-def replace_ligands(atom_dict, lig_dict, sites, buffer, inp_rep, filename):
+def replace_ligands(atom_dict, lig_dict, cap, sites, buffer, inp_rep, filename):
     replacement_list = []
     rep_ext_list = []
-    loc_dict = {"H": []}
+    loc_dict = {cap[:-4]: []}
     rep_dict = copy.deepcopy(lig_dict)
     lig_dict_inv = {}
     for ligand, lig_val in lig_dict.items():
-        if lig_val["ligand_type"] != "H.xyz":
+        if lig_val["ligand_type"] != cap:
             if inp_rep:
                 replacement_list = [inp_rep[0]]
                 rep_ext_list = [inp_rep[1]]
@@ -285,7 +303,7 @@ def replace_ligands(atom_dict, lig_dict, sites, buffer, inp_rep, filename):
     for atom, at_values in atom_dict.items():
         if at_values["type"] == 'ligand':
             atom_del_list.append(atom)
-            if at_values["ligand_type"] != "H.xyz":
+            if at_values["ligand_type"] != cap:
                 rep_dict[lig_dict_inv[at_values["ligand_type"]]]["loc_info"][at_values["loc_id"]] = {
                     "loc": at_values["loc"],
                     "rotation": at_values["rotation"]
@@ -298,7 +316,7 @@ def replace_ligands(atom_dict, lig_dict, sites, buffer, inp_rep, filename):
         for item in atom_del_list:
             del atom_dict[item]
         for lig, values in rep_dict.items():
-            atom_dict = place_ligands(atom_dict, values, sites, buffer, True)
+            atom_dict = place_ligands(atom_dict, values, sites, buffer, True, cap)
             if atom_dict == 1:
                 atom_dict = copy.deepcopy(atom_dict_copy)
                 sites = copy.deepcopy(sites_copy)
@@ -336,13 +354,14 @@ def tetra_sites(dict):
         if len(values['bound']) < 4 and values["type"] == "crystal":
             sites[id] = {}
             tetrahedron = [[x, x, x], [x, -x, -x], [-x, x, -x], [-x, -x, x]]
-            primary_xyz = [values['x'], values['y'], values['z']]
+            primary_xyz = values["coor"]
             connection_list = []
             # Create unit vectors for all connected atoms
             for secondary in values['bound']:
-                sec_xyz_rel = [dict[secondary]['x'] - primary_xyz[0],
-                               dict[secondary]['y'] - primary_xyz[1],
-                               dict[secondary]['z'] - primary_xyz[2]]
+                sec_xyz_rel = [c1 - c2 for c1, c2 in zip(dict[secondary]["coor"], primary_xyz)]
+                # sec_xyz_rel = [dict[secondary]['x'] - primary_xyz[0],
+                #                dict[secondary]['y'] - primary_xyz[1],
+                #                dict[secondary]['z'] - primary_xyz[2]]
                 sec_xyz_rel = hf.normaliser(sec_xyz_rel)
                 connection_list.append(sec_xyz_rel)
 
@@ -408,7 +427,7 @@ def tetra_sites(dict):
     return sites
 
 
-def prep_ligand_file(atom_dict, ligand_type, extension):
+def prep_ligand_file(atom_dict, ligand_type, extension, cap):
     """Read ligand file, possibly extend with another ligand and add to an object"""
 
     path = "../Ligands/" + ligand_type
@@ -436,28 +455,28 @@ def prep_ligand_file(atom_dict, ligand_type, extension):
             for i in range(1, 4):
                 values_list[i] = float(values_list[i])
             lig.atoms[id] = {
-                            "x": float(values_list[1]),
-                            "y": float(values_list[2]),
-                            "z": float(values_list[3]),
+                            "coor": values_list[1:],
+                            "x": values_list[1],
+                            "y": values_list[2],
+                            "z": values_list[3],
                             "element": values_list[0]
                         }
             id += 1
         line_number += 1
-
     # Extend ligand if needed
-    if extension is not False and ligand_type != "H.xyz":
+    if extension is not False and ligand_type != cap:
         path_ext = "../Ligands/" + extension
         file_ext = open(path_ext, 'r')
         line_number = 0
         # Maybe use this later
         random_rotation = random.random() * 2 * math.pi * 0
         rep = lig.atoms[max(lig.atoms)]
-        rep_coor = [rep["x"], rep["y"], rep["z"]]
+        rep_coor = rep["coor"]
         min_dist = math.inf
         ext = {}
         # Check for atom to connect extension to
         for atom, values in lig.atoms.items():
-            dist = hf.distance_checker(rep_coor, [values['x'], values['y'], values['z']])
+            dist = hf.distance_checker(rep_coor, values["coor"])
             if dist < min_dist and dist != 0:
                 min_dist = dist
                 closest_atom = values
@@ -465,7 +484,7 @@ def prep_ligand_file(atom_dict, ligand_type, extension):
         del lig.atoms[max(lig.atoms)]
 
         # Get correct rotations for extension
-        unit_v = hf.normaliser([c1 - c2 for c1, c2 in zip(rep_coor, [closest_atom['x'], closest_atom['y'], closest_atom['z']])])
+        unit_v = hf.normaliser([c1 - c2 for c1, c2 in zip(rep_coor, closest_atom['coor'])])
         angle = hf.angle_checker(unit_v, [0, 0, 1])
         axis = np.cross(unit_v, [0, 0, 1])
         if round(np.linalg.norm(axis), 2) == 0:
@@ -499,11 +518,12 @@ def prep_ligand_file(atom_dict, ligand_type, extension):
                 ext_coor = np.dot(rot_mat1, ext_coor)
                 ext_coor = np.dot(rot_mat2, ext_coor)
                 ext[id] = {
-                                "x": ext_coor[0] + closest_atom['x'],
-                                "y": ext_coor[1] + closest_atom['y'],
-                                "z": ext_coor[2] + closest_atom['z'],
-                                "element": values_list[0]
-                            }
+                        "coor": [c1 + c2 for c1, c2 in zip(ext_coor, closest_atom["coor"])],
+                        "x":    ext_coor[0] + closest_atom['x'],
+                        "y":    ext_coor[1] + closest_atom['y'],
+                        "z":    ext_coor[2] + closest_atom['z'],
+                        "element": values_list[0]
+                        }
             line_number += 1
             id += 1
         lig.atoms = {**lig.atoms, **ext}
@@ -520,6 +540,7 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
     original_ligand = ligand_type
     j = 0
     tried = []
+    print(cap)
     if extension:
         print("\nPlacing " + ligand_type[:-4] + " + " + extension[:-4])
     else:
@@ -542,7 +563,7 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
                 return 1
             break
         # Use predetermined sites
-        if fixed_loc and ligand_type != "H.xyz":
+        if fixed_loc and ligand_type != cap:
             if len(lig_info["loc_info"]) == 0:
                 break
             loc_id = random.choice(list(lig_info["loc_info"]))
@@ -558,7 +579,7 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
             random_rotation = random.random() * 2 * math.pi
         loc_primary_xyz = sites[loc_id]['primary_xyz']
         tried_loc = []
-        lig = prep_ligand_file(atom_dict, ligand_type, extension)
+        lig = prep_ligand_file(atom_dict, ligand_type, extension, cap)
 
         # Loop over every site connected to chosen atom
         while loc not in tried_loc:
@@ -588,6 +609,7 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
                     atom_xyz = [c1 + c2 for c1, c2 in zip(new_v, loc_primary_xyz)]
                     atom_element = lig.atoms[atom]['element']
                     temp_atom_dict[id] = {
+                                    "coor": atom_xyz,
                                     "x": atom_xyz[0],
                                     "y": atom_xyz[1],
                                     "z": atom_xyz[2],
@@ -603,12 +625,9 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
                     # Check for overlap
                     if ligand_type != cap:
                         for test_atom, values in atom_dict.items():
-                            try:
-                                space = getattr(bond_dis, atom_element)().distances[values["element"]] + buffer
-                            except KeyError:
-                                space = float(input("Bond length between " + str(atom_element) + " and " + str(values["element"]) + " not available. Enter manually: ")) + buffer
+                            space = getattr(bond_dis, atom_element)().distances[values["element"]] + buffer
                             if test_atom != loc_id:
-                                dist = hf.distance_checker([values['x'], values['y'], values['z']], xyz_list[-1])
+                                dist = hf.distance_checker(values["coor"], xyz_list[-1])
                                 if dist < space:
                                     broken = True
                                     break
@@ -621,17 +640,18 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
                             min_dist_lig = math.inf
                             for test_lig, values in atom_dict.items():
                                 if values["type"] == "ligand":
-                                    dist = hf.distance_checker([values['x'], values['y'], values['z']], [c1 + c2 for c1, c2 in zip(new_pos, loc_primary_xyz)])
+                                    dist = hf.distance_checker(values["coor"], [c1 + c2 for c1, c2 in zip(new_pos, loc_primary_xyz)])
                                     bond_len_loc = getattr(bond_dis, atom_element)().distances[values["element"]]
                                     if dist < bond_len_loc + 0.3:
                                         if dist < min_dist_lig:
                                             min_dist_lig = dist
-                                            min_dist_lig_coor = [values['x'], values['y'], values['z']]
+                                            min_dist_lig_coor = values["coor"]
                                             changed = True
                             if min_dist_lig == math.inf:
                                 if changed:
                                     xyz_list = [c1 + c2 for c1, c2 in zip(new_pos, loc_primary_xyz)]
                                     temp_atom_dict[id-1] = {
+                                                    "coor": xyz_list,
                                                     "x": xyz_list[0],
                                                     "y": xyz_list[1],
                                                     "z": xyz_list[2],
@@ -676,7 +696,7 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
                             del sites[loc_id]
                         tried_loc = [loc]
                         ligand_type = cap
-                        lig = prep_ligand_file(atom_dict, "H.xyz", False)
+                        lig = prep_ligand_file(atom_dict, cap, False, cap)
                         j += 1
                         break
                 else:

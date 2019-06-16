@@ -1,6 +1,7 @@
 import math
 import numpy as np
 import bonding_distances as bond_dis
+import sys
 
 
 def distance_checker(xyz1, xyz2):
@@ -61,3 +62,10 @@ def y2true(text):
             return False
         else:
             text = input("Wrong input, try again: ")
+
+def dis_in_file(element):
+    try:
+        test = getattr(bond_dis, element)
+    except AttributeError:
+        print("\nElement currently unsupported in bonding_distances.py. Please add values to file before trying again.")
+        sys.exit()
