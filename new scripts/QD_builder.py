@@ -120,6 +120,9 @@ def crystal_reader(filename):
 
 
 def builder(atom_dict):
+    foldername = input("Save in folder (or main): ")
+    if foldername == "main":
+        foldername = False
     filename = input("Write to file: ")
     sites = tetra_sites(atom_dict)
     n_sites = len(sites)
@@ -221,7 +224,7 @@ def builder(atom_dict):
     while True:
         stopped = False
         for ligand, values in lig_dict.items():
-            print(values)
+            print(len(sites))
             atom_dict = place_ligands(atom_dict, values, sites, buffer, False, cap)
             if atom_dict == 1:
                 atom_dict = copy.deepcopy(atom_dict_copy)
@@ -232,9 +235,9 @@ def builder(atom_dict):
             break
     # Write atoms to file
     if series_b:
-        dict2file(atom_dict, filename + base_list[0][:-4] + "+" + ext_list[0][:-4])
+        dict2file(atom_dict, filename + base_list[0][:-4] + "+" + ext_list[0][:-4], foldername)
     else:
-        dict2file(atom_dict, filename)
+        dict2file(atom_dict, filename, foldername)
 
     # Replace ligands to create new QD
     if series_b:
@@ -250,7 +253,7 @@ def builder(atom_dict):
                 sites = sites_copy.copy()
                 inp_rep = [bas, ext]
                 filename_rep = filename + bas[:-4] + "+" + ext[:-4]
-                replaced = replace_ligands(atom_dict, lig_dict, cap, sites, buffer, inp_rep, filename_rep)
+                replaced = replace_ligands(atom_dict, lig_dict, cap, sites, buffer, inp_rep, filename_rep, foldername)
                 atom_dict = replaced[0]
                 lig_dict = replaced[1]
 
@@ -261,7 +264,7 @@ def builder(atom_dict):
             sites = sites_copy.copy()
             filename_rep = input("Write to file: ")
             buffer = float(input("Buffer: "))
-            replaced = replace_ligands(atom_dict, lig_dict, cap, sites, buffer, False, filename_rep)
+            replaced = replace_ligands(atom_dict, lig_dict, cap, sites, buffer, False, filename_rep, foldername)
             atom_dict = replaced[0]
             lig_dict = replaced[1]
         else:
@@ -269,7 +272,7 @@ def builder(atom_dict):
 
 
 # Replace ligands in QD with new ligands
-def replace_ligands(atom_dict, lig_dict, cap, sites, buffer, inp_rep, filename):
+def replace_ligands(atom_dict, lig_dict, cap, sites, buffer, inp_rep, filename, foldername):
     replacement_list = []
     rep_ext_list = []
     loc_dict = {cap[:-4]: []}
@@ -316,6 +319,7 @@ def replace_ligands(atom_dict, lig_dict, cap, sites, buffer, inp_rep, filename):
         for item in atom_del_list:
             del atom_dict[item]
         for lig, values in rep_dict.items():
+            print(len(sites))
             atom_dict = place_ligands(atom_dict, values, sites, buffer, True, cap)
             if atom_dict == 1:
                 atom_dict = copy.deepcopy(atom_dict_copy)
@@ -325,15 +329,18 @@ def replace_ligands(atom_dict, lig_dict, cap, sites, buffer, inp_rep, filename):
             else:
                 done = True
 
-    dict2file(atom_dict, filename)
+    dict2file(atom_dict, filename, foldername)
 
     return atom_dict, rep_dict
 
 
-def dict2file(dict, filename):
-    if not os.path.exists("../Created_QD/" + filename.partition("/")[0] + "/"):
-        os.makedirs("../Created_QD/" + filename.partition("/")[0] + "/")
-    file = open("../Created_QD/" + filename + ".xyz", "w")
+def dict2file(dict, filename, foldername):
+    if foldername:
+        if not os.path.exists("../Created_QD/" + foldername):
+            os.makedirs("../Created_QD/" + foldername)
+        file = open("../Created_QD/" + foldername + "/" + filename + ".xyz", "w")
+    else:
+        file = open("../Created_QD/" + filename + ".xyz", "w")
     file.write("        \n\n")
     for atom, values in dict.items():
         file.write(values['element'] + "\t" + str(values['x']) + "\t\t" +
@@ -359,9 +366,6 @@ def tetra_sites(dict):
             # Create unit vectors for all connected atoms
             for secondary in values['bound']:
                 sec_xyz_rel = [c1 - c2 for c1, c2 in zip(dict[secondary]["coor"], primary_xyz)]
-                # sec_xyz_rel = [dict[secondary]['x'] - primary_xyz[0],
-                #                dict[secondary]['y'] - primary_xyz[1],
-                #                dict[secondary]['z'] - primary_xyz[2]]
                 sec_xyz_rel = hf.normaliser(sec_xyz_rel)
                 connection_list.append(sec_xyz_rel)
 
@@ -555,6 +559,7 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
         # Randomly choose site, get relevant info, don't pick site that has already been tried
         sites_list = list(sites).copy()
         remaining_sites = [x for x in sites_list if x not in tried]
+        print(len(remaining_sites))
         if len(remaining_sites) == 0:
             print("\nUnable to place more ligands of type " + str(original_ligand) + ". Placed " + str(j) + " out of " + str(n_ligands) + " requested ligands. Continuing with other types.\n")
             retry = hf.y2true(input("Fail, try again? y/n: "))
@@ -568,7 +573,7 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
                 break
             loc_id = random.choice(list(lig_info["loc_info"]))
             loc = lig_info["loc_info"][loc_id]["loc"]
-            loc_sites = sites[loc_id]['sites_xyz'].copy()
+            loc_sites = copy.deepcopy(sites[loc_id]['sites_xyz'])
             random_rotation = lig_info["loc_info"][loc_id]["rotation"]
             del lig_info["loc_info"][loc_id]
         # Use random sites
@@ -580,9 +585,15 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
         loc_primary_xyz = sites[loc_id]['primary_xyz']
         tried_loc = []
         lig = prep_ligand_file(atom_dict, ligand_type, extension, cap)
+        stop = False
 
         # Loop over every site connected to chosen atom
-        while loc not in tried_loc:
+        while True:
+            for vec in tried_loc:
+                if hf.distance_checker(vec, loc) < 0.001:
+                    stop = True
+            if stop:
+                break
             # Get correct rotation for ligand relative to site
             axis = np.cross(loc, [0, 0, 1])
             # Prevent dividing by 0 when vectors are already lined up
@@ -592,6 +603,7 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
             else:
                 angle = -hf.angle_checker(loc, [0, 0, 1])
             rot_mat = hf.rotation_matrix(axis, angle)
+            print(ligand_type)
 
             # Place ligand if possible, otherwise rotate
             while True:
@@ -774,7 +786,6 @@ def place_bridge_ligands(atom_dict, sites, bridge_dict, bridge_ligand):
     id = max(atom_dict) + 1
     for bridge, values in bridge_dict.items():
         crys_val = atom_dict[values["connected"][0]]
-        crys_vec = [crys_val["x"], crys_val["y"], crys_val["z"]]
         random_rotation = math.pi/4
         # Determine height of ligand. If bonding distance is too short, set to 0.
         # This is only correct for crystal with one kind of atom
@@ -805,7 +816,7 @@ def place_bridge_ligands(atom_dict, sites, bridge_dict, bridge_ligand):
             test_vx = [1, 0, 0]
             test_vx_rot = np.dot(rot_mat, [1, 0, 0])
             test_vz_rot = np.dot(rot_mat, [0, 0, 1])
-            uhh = [atom_dict[values["connected"][0]]["x"], atom_dict[values["connected"][0]]["y"], atom_dict[values["connected"][0]]["z"]]
+            uhh = atom_dict[values["connected"][0]]["coor"]
             new_ding = [c1 - c2 for c1, c2 in zip(uhh, values["primary_xyz"])]
             new_ding = hf.normaliser(new_ding)
             normal_1 = np.cross(test_vx_rot, test_vz_rot)
@@ -841,7 +852,7 @@ def place_bridge_ligands(atom_dict, sites, bridge_dict, bridge_ligand):
                     if values2['type'] == "crystal":
                         space = space + 0.25
                     if test_atom not in values["connected"]:
-                        dist = hf.distance_checker([values2['x'], values2['y'], values2['z']], xyz_list[-1])
+                        dist = hf.distance_checker(values2["coor"], xyz_list[-1])
                         if dist < space + 0.25:
                             break
             atom_dict = {**atom_dict, **temp_atom_dict}
