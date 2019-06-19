@@ -1,6 +1,7 @@
 # Quantum Dot builder
 
-This script either builds quantum dots from scratch, or attaches ligands to existing nanocrystals. Crystals are either a zincblende or diamond cube structure.
+This script either builds quantum dots from scratch, or attaches ligands to
+existing nanocrystals. Crystals are either a zincblende or diamond cube structure.
 
 ## Usage
 
@@ -13,7 +14,7 @@ python QD_builder.py
 and enter the requested parameters.
 
 
-# Adding your own ligands and crystals
+## Adding your own ligands and crystals
 It is possible to add your own ligands and crystals. In order to add your own
 ligands, create an .xyz file and place it in the Ligands folder. The ligand
 should be aligned along the z-axis, and the atom that connects to the quantum
@@ -35,4 +36,8 @@ These don't need to be centred at the origin. The script currently only supports
 zincblende and diamond cubic structures.
 
 Important:
-This programme needs to know the bonding lengths between different kind of elements to work. These values are stored in
+This programme needs to know the bonding lengths between different kind of
+elements to work. These values are stored in bonding_distances.csv. Not every
+element has been entered in this file. When you try to use elements that are
+not yet supported the programme will notify you, and you can manually enter them
+into the csv file.

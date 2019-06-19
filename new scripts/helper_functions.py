@@ -46,12 +46,15 @@ def rotation_matrix(axis, theta):
 def bond_reader(el_a, el_b):
     """Given 2 elements returns bonding distance from bonding_distances.csv"""
     with open('bonding_distances.csv') as csvfile:
-            reader = csv.DictReader(csvfile)
-            for row in reader:
-                if row['Element Name'] == el_a:
-                    dis = float(row[el_b])
-                    csvfile.close()
-                    return dis
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            if row['Element Name'] == el_a:
+                dis = float(row[el_b])
+                csvfile.close()
+                return dis
+        print("Couldn't find distance between " + el_a + " and " + el_b + " in bonding_distances.csv. Please add manually.")
+        sys.exit()
+
 
 
 def bond_checker(atom, dict):
