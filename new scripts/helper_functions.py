@@ -1,7 +1,7 @@
 import math
 import numpy as np
-import bonding_distances as bond_dis
 import sys
+import csv
 
 
 def distance_checker(xyz1, xyz2):
@@ -43,11 +43,22 @@ def rotation_matrix(axis, theta):
                      [2 * (bd + ac), 2 * (cd - ab), aa + dd - bb - cc]])
 
 
+def bond_reader(el_a, el_b):
+    """Given 2 elements returns bonding distance from bonding_distances.csv"""
+    with open('bonding_distances.csv') as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                if row['Element Name'] == el_a:
+                    dis = float(row[el_b])
+                    csvfile.close()
+                    return dis
+
+
 def bond_checker(atom, dict):
-    "Check for all atoms in bonding range"
+    """Check for all atoms in bonding range"""
     bound = []
     for item, values in dict.items():
-        bond_range = getattr(bond_dis, atom[0])().distances[values["element"]] + 0.1
+        bond_range = bond_reader(atom[0], values["element"]) + 0.1
         if (math.sqrt((atom[1] - values['x'])**2 + (atom[2] - values['y'])**2 +
                       (atom[3] - values['z'])**2) <= bond_range):
             bound.append(item)
@@ -55,6 +66,7 @@ def bond_checker(atom, dict):
 
 
 def y2true(text):
+    """Converts strings y and n to boolean"""
     while True:
         if text == 'y':
             return True
@@ -63,9 +75,10 @@ def y2true(text):
         else:
             text = input("Wrong input, try again: ")
 
-def dis_in_file(element):
-    try:
-        test = getattr(bond_dis, element)
-    except AttributeError:
-        print("\nElement currently unsupported in bonding_distances.py. Please add values to file before trying again.")
-        sys.exit()
+
+# def dis_in_file(element):
+#     try:
+#         test = getattr(bond_dis, element)
+#     except AttributeError:
+#         print("\nElement currently unsupported in bonding_distances.py. Please add values to file before trying again.")
+#         sys.exit()

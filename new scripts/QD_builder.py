@@ -3,7 +3,6 @@ import ligands
 import numpy as np
 import math
 import random
-import bonding_distances as bond_dis
 import os
 import helper_functions as hf
 import copy
@@ -77,7 +76,7 @@ def crystal_builder(structure, a, atom_a, atom_b, diameter):
 
 # Read xyz-file and place atoms in a dict.
 def crystal_reader(filename):
-    file = open("../SiQD/" + filename, 'r')
+    file = open("../input_crystals/" + filename, 'r')
     element_list = []
     while True:
         el = input("Type element in crystal, or type 'done': ")
@@ -506,7 +505,7 @@ def prep_ligand_file(atom_dict, ligand_type, extension, cap):
                 values_list = line.split()
                 ext_coor = [float(values_list[1]), float(values_list[2]), float(values_list[3])]
                 if ext_coor[0] == ext_coor[1] == ext_coor[2] == 0:
-                    initial_length_ext = getattr(bond_dis, values_list[0])().distances[closest_atom["element"]]
+                    initial_length_ext = hf.bond_reader(values_list[0], closest_atom["element"])
                     line_number = 0
                     file_ext.seek(0)
                     break
@@ -611,7 +610,7 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
                 temp_atom_dict = {}
                 broken = False
                 min_dist_lig = math.inf
-                initial_length = getattr(bond_dis, lig.base_element)().distances[atom_dict[loc_id]["element"]]
+                initial_length = hf.bond_reader(lig.base_element, atom_dict[loc_id]["element"])
 
                 for atom in lig.atoms:
                     # Rotate every atom in ligand according to random_rotation
@@ -637,7 +636,7 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
                     # Check for overlap
                     if ligand_type != cap:
                         for test_atom, values in atom_dict.items():
-                            space = getattr(bond_dis, atom_element)().distances[values["element"]] + buffer
+                            space = hf.bond_reader(atom_element, values["element"])
                             if test_atom != loc_id:
                                 dist = hf.distance_checker(values["coor"], xyz_list[-1])
                                 if dist < space:
@@ -653,7 +652,7 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
                             for test_lig, values in atom_dict.items():
                                 if values["type"] == "ligand":
                                     dist = hf.distance_checker(values["coor"], [c1 + c2 for c1, c2 in zip(new_pos, loc_primary_xyz)])
-                                    bond_len_loc = getattr(bond_dis, atom_element)().distances[values["element"]]
+                                    bond_len_loc = hf.bond_reader(atom_element, values["element"])
                                     if dist < bond_len_loc + 0.3:
                                         if dist < min_dist_lig:
                                             min_dist_lig = dist
@@ -791,7 +790,7 @@ def place_bridge_ligands(atom_dict, sites, bridge_dict, bridge_ligand):
         # This is only correct for crystal with one kind of atom
         lig = prep_ligand_file(atom_dict, "/DB_Ligands/" + bridge_ligand + ".xyz", False)
         try:
-            initial_length = math.sqrt(getattr(bond_dis, lig.base_element)().distances["Si"]**2 - (3.84/2)**2)
+            initial_length = math.sqrt(hf.bond_reader(lig.base_element, "Si")  - (3.84/2)**2)
         except ValueError:
             initial_length = 0
         # Get correct rotation for ligand relative to site
@@ -847,7 +846,7 @@ def place_bridge_ligands(atom_dict, sites, bridge_dict, bridge_ligand):
                 xyz_list.append(atom_xyz)
                 id += 1
                 for test_atom, values2 in atom_dict.items():
-                    space = getattr(bond_dis, atom_element)().distances[values2["element"]]
+                    space = hf.bond_reader(atom_element, values2["element"])
                     # Stay further away from the crystal atoms
                     if values2['type'] == "crystal":
                         space = space + 0.25
