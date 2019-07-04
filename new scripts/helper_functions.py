@@ -52,20 +52,75 @@ def bond_reader(el_a, el_b):
                 dis = float(row[el_b])
                 csvfile.close()
                 return dis
-        print("Couldn't find distance between " + el_a + " and " + el_b + " in bonding_distances.csv. Please add manually.")
+        print("Couldn't find distance between " + el_a + " and " + el_b + " in bonding_distances.csv. Please add manually, or use add_bond_dis2csv.py")
         sys.exit()
 
 
+def csv2dict(filename):
+    dis_dict = {}
+    with open(filename) as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            el_a = row["Element Name"]
+            dis_dict[el_a] = {}
+            for entry in row:
+                if entry != "Element Name":
+                    dis_dict[el_a][entry] = float(row[entry])
+    csvfile.close()
+    return dis_dict
 
-def bond_checker(atom, dict):
+
+def bond_checker(atom, dict, bond_dict):
     """Check for all atoms in bonding range"""
     bound = []
     for item, values in dict.items():
         bond_range = bond_reader(atom[0], values["element"]) + 0.1
-        if (math.sqrt((atom[1] - values['x'])**2 + (atom[2] - values['y'])**2 +
-                      (atom[3] - values['z'])**2) <= bond_range):
+        if distance_checker(atom[1:], values["coor"]) <= bond_range:
             bound.append(item)
     return bound
+
+
+def closest_atom(dict, coor):
+    "Given a dict and coordinates returns the closest atom"
+    min_dis = math.inf
+    for atom, values in dict.items():
+        dis = distance_checker(coor, values["coor"])
+        if dis < min_dis and dis > 0.01:
+            min_dis = dis
+            min_id = atom
+    return min_id
+
+
+def file2dict(file, dict, start_id):
+    """
+    Builds simple dict out of .xyz file, containing just id, elements and
+    coordinates
+    """
+    id = start_id
+    line_number = 0
+    file.seek(0)
+    for line in file:
+        if line_number == 0:
+            n_atoms = int(float(line.strip()))
+        if line_number >= 2 and line_number < n_atoms + 2:
+            values_list = line.split()
+            for i in range(1, 4):
+                values_list[i] = float(values_list[i])
+            dict[id] = {
+                    "coor": values_list[1:],
+                    "element": values_list[0]
+                    }
+            id += 1
+        line_number += 1
+    return dict
+
+
+def base_atom(dict):
+    for atom, values in dict.items():
+        xyz = values["coor"]
+        if xyz[0] == xyz[1] == xyz[2] == 0:
+            return atom
+
 
 
 def y2true(text):
@@ -77,11 +132,3 @@ def y2true(text):
             return False
         else:
             text = input("Wrong input, try again: ")
-
-
-# def dis_in_file(element):
-#     try:
-#         test = getattr(bond_dis, element)
-#     except AttributeError:
-#         print("\nElement currently unsupported in bonding_distances.py. Please add values to file before trying again.")
-#         sys.exit()

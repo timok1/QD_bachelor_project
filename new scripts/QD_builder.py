@@ -1,5 +1,4 @@
 import unit_cells
-import ligands
 import numpy as np
 import math
 import random
@@ -9,10 +8,14 @@ import copy
 import sys
 
 
-# Build crystal with input
-def crystal_builder(structure, a, atom_a, atom_b, diameter):
-    hf.dis_in_file(atom_a)
-    hf.dis_in_file(atom_b)
+def crystal_builder(a, atom_a, atom_b, diameter):
+    """
+    This function takes in the lattice constant, elements in the crystal and
+    the diameter of the nanocrystal to be built. The unit cell is copied in
+    all directions and cutoffs are made at the (111), (110) and (100) planes.
+    ID numbers are assigned and neighbours are calculated.
+    Then coordinates, elements, neighbours and atom id are stored in a dict.
+    """
     n_unit = math.ceil(diameter)
     n_range = np.arange(-n_unit/2.0 + 0.5, n_unit/2.0)
     # Get unit cell
@@ -41,12 +44,9 @@ def crystal_builder(structure, a, atom_a, atom_b, diameter):
                             abs(atom_y) + abs(atom_z) <= boundary_110) and (abs(atom_x) <= boundary_100
                             and abs(atom_y) <= boundary_100 and abs(atom_z) <= boundary_100)):
                         all_atoms.append(atom_details)
-                        bound = hf.bond_checker(atom_details, atom_dict)
+                        bound = hf.bond_checker(atom_details, atom_dict, bond_len_dict)
                         atom_dict[id] = {
                                         "coor": [atom_x, atom_y, atom_z],
-                                        "x": atom_x,
-                                        "y": atom_y,
-                                        "z": atom_z,
                                         "element": atom_element,
                                         "bound": bound,
                                         "type": "crystal"
@@ -74,15 +74,18 @@ def crystal_builder(structure, a, atom_a, atom_b, diameter):
     return atom_dict
 
 
-# Read xyz-file and place atoms in a dict.
 def crystal_reader(filename):
+    """
+    Takes an .xyz file and processes it in such a way that the output is
+    identical to crystal_builder()
+    """
     file = open("../input_crystals/" + filename, 'r')
     element_list = []
+    # Register which elements belong to core, in attempt to allow for .xyz
+    # files to contain ligands for a future feature
     while True:
         el = input("Type element in crystal, or type 'done': ")
-        if el != 'done':
-            hf.dis_in_file(el)
-        else:
+        if el == 'done':
             break
         element_list.append(el)
 
@@ -93,24 +96,23 @@ def crystal_reader(filename):
         if line_number == 0:
             n_atoms = line.strip()
             n_atoms = int(float(n_atoms))
+        # Go to first element
         if line_number >= 2 and line_number < n_atoms + 2:
             values_list = line.split()
             for i in range(1, 4):
                 values_list[i] = float(values_list[i])
-            bound = hf.bond_checker(values_list, atom_dict)
+            bound = hf.bond_checker(values_list, atom_dict, bond_len_dict)
             if values_list[0] in element_list:
                 type = "crystal"
             else:
                 type = "ligand"
             atom_dict[id] = {
                         "coor": values_list[1:],
-                        "x": values_list[1],
-                        "y": values_list[2],
-                        "z": values_list[3],
                         "element": values_list[0],
                         "bound": bound,
                         "type": type
                         }
+            # update bound for already placed atoms
             for item in bound:
                 atom_dict[item]["bound"].append(id)
             id += 1
@@ -149,20 +151,23 @@ def builder(atom_dict):
             if ext == 'done':
                 break
             if ext == 'none':
-                ext_list.append(False)
+                ext_list.append([False])
             else:
-                ext_list.append(ext + ".xyz")
+                ext_list.append([ext + ".xyz"])
+                extra_ext = input("Further extension to extension, or type n: ")
+                if extra_ext != 'n':
+                    ext_list[-1].append(extra_ext + ".xyz")
         coverage = float(input("Coverage (fraction): "))
         lig_dict[0] = {
                 "ligand_type": base_list[0],
-                "extension": ext_list[0],
+                "extension": [ext_list[0]],
                 "coverage": coverage,
                 "n_ligands": round(coverage * n_sites)
         }
         cap = input("Cap remaining sites with (single atom): ") + ".xyz"
         lig_dict[1] = {
                 "ligand_type": cap,
-                "extension": False,
+                "extension": [False],
                 "coverage": 1,
                 "n_ligands": n_sites
             }
@@ -184,9 +189,12 @@ def builder(atom_dict):
             ligand_types.append(ligand_file)
             extend = hf.y2true(input("Extend ligand? Note: this replaces the last atom in the ligand file. y/n: "))
             if extend:
-                extension_list.append(input("Extend with: ") + ".xyz")
+                extension_list.append([input("Extend with: ") + ".xyz"])
+                extra_ext = input("Further extension to extension, or type n: ")
+                if extra_ext != 'n':
+                    extension_list[-1].append(extra_ext  + ".xyz")
             else:
-                extension_list.append(False)
+                extension_list.append([False])
             coverage = float(input("Coverage (fraction): "))
             coverage_list.append(coverage)
             n_ligands_list.append(round(coverage * n_sites))
@@ -202,7 +210,7 @@ def builder(atom_dict):
                 cap = input("Cap remaining sites with (single atom): ") + ".xyz"
                 lig_dict[i] = {
                         "ligand_type": cap,
-                        "extension": False,
+                        "extension": [False],
                         "coverage": 1,
                         "n_ligands": n_sites
                 }
@@ -223,7 +231,6 @@ def builder(atom_dict):
     while True:
         stopped = False
         for ligand, values in lig_dict.items():
-            print(len(sites))
             atom_dict = place_ligands(atom_dict, values, sites, buffer, False, cap)
             if atom_dict == 1:
                 atom_dict = copy.deepcopy(atom_dict_copy)
@@ -251,7 +258,10 @@ def builder(atom_dict):
                 # lig_dict = copy.deepcopy(lig_dict_copy)
                 sites = sites_copy.copy()
                 inp_rep = [bas, ext]
-                filename_rep = filename + bas[:-4] + "+" + ext[:-4]
+                if not ext:
+                    filename_rep = filename + bas[:-4]
+                else:
+                    filename_rep = filename + bas[:-4] + "+" + ext[:-4]
                 replaced = replace_ligands(atom_dict, lig_dict, cap, sites, buffer, inp_rep, filename_rep, foldername)
                 atom_dict = replaced[0]
                 lig_dict = replaced[1]
@@ -290,8 +300,8 @@ def replace_ligands(atom_dict, lig_dict, cap, sites, buffer, inp_rep, filename, 
                     rep_ext_list.append(input("Extend with: ") + ".xyz")
                     rep_dict[ligand]["extension"] = rep_ext_list[-1]
                 else:
-                    rep_ext_list.append(False)
-                    rep_dict[ligand]["extension"] = False
+                    rep_ext_list.append([False])
+                    rep_dict[ligand]["extension"] = [False]
             loc_dict[ligand] = {
                                 "loc_id": [],
                                 "replacement": replacement_list[-1]
@@ -318,7 +328,6 @@ def replace_ligands(atom_dict, lig_dict, cap, sites, buffer, inp_rep, filename, 
         for item in atom_del_list:
             del atom_dict[item]
         for lig, values in rep_dict.items():
-            print(len(sites))
             atom_dict = place_ligands(atom_dict, values, sites, buffer, True, cap)
             if atom_dict == 1:
                 atom_dict = copy.deepcopy(atom_dict_copy)
@@ -342,8 +351,8 @@ def dict2file(dict, filename, foldername):
         file = open("../Created_QD/" + filename + ".xyz", "w")
     file.write("        \n\n")
     for atom, values in dict.items():
-        file.write(values['element'] + "\t" + str(values['x']) + "\t\t" +
-                   str(values['y']) + "\t\t" + str(values['z']) + "\n")
+        file.write(values['element'] + "\t" + str(values['coor'][0]) + "\t\t" +
+                   str(values['coor'][1]) + "\t\t" + str(values['coor'][2]) + "\n")
     file.seek(0)
     file.write(str(len(dict)))
     file.close()
@@ -436,101 +445,117 @@ def prep_ligand_file(atom_dict, ligand_type, extension, cap):
     path = "../Ligands/" + ligand_type
     file = open(path, 'r')
     id = 0
-    line_number = 0
-    lig = ligands.empty_lig()
+    lig = {}
     # Get element of atom connected to crystal
-    for line in file:
-        if line_number >= 2:
-            values_list = line.split()
-            if float(values_list[1]) == float(values_list[2]) == float(values_list[3]) == 0:
-                lig.base_element = values_list[0]
-                break
-        line_number += 1
+    lig = hf.file2dict(file, lig, id)
+    file.close()
 
-    # Add elements in file to dict
-    line_number = 0
-    file.seek(0)
-    for line in file:
-        if line_number == 0:
-            n_atoms = int(float(line.strip()))
-        if line_number >= 2 and line_number < n_atoms + 2:
-            values_list = line.split()
-            for i in range(1, 4):
-                values_list[i] = float(values_list[i])
-            lig.atoms[id] = {
-                            "coor": values_list[1:],
-                            "x": values_list[1],
-                            "y": values_list[2],
-                            "z": values_list[3],
-                            "element": values_list[0]
-                        }
-            id += 1
-        line_number += 1
     # Extend ligand if needed
-    if extension is not False and ligand_type != cap:
-        path_ext = "../Ligands/" + extension
-        file_ext = open(path_ext, 'r')
-        line_number = 0
-        # Maybe use this later
-        random_rotation = random.random() * 2 * math.pi * 0
-        rep = lig.atoms[max(lig.atoms)]
-        rep_coor = rep["coor"]
-        min_dist = math.inf
-        ext = {}
-        # Check for atom to connect extension to
-        for atom, values in lig.atoms.items():
-            dist = hf.distance_checker(rep_coor, values["coor"])
-            if dist < min_dist and dist != 0:
-                min_dist = dist
-                closest_atom = values
-        # Remove last atom
-        del lig.atoms[max(lig.atoms)]
+    if extension[0] is not False and ligand_type != cap:
+        for item in extension:
+            ext = extend_ligand(atom_dict, lig, item)
+            lig = {**lig, **ext}
+        # path_ext = "../Ligands/" + extension
+        # file_ext = open(path_ext, 'r')
+        # line_number = 0
+        # # Maybe use this later
+        # random_rotation = random.random() * 2 * math.pi * 0
+        # rep = lig.atoms[max(lig.atoms)]
+        # rep_coor = rep["coor"]
+        # min_dist = math.inf
+        # ext = {}
+        # # Check for atom to connect extension to
+        # for atom, values in lig.atoms.items():
+        #     dist = hf.distance_checker(rep_coor, values["coor"])
+        #     if dist < min_dist and dist != 0:
+        #         min_dist = dist
+        #         closest_atom = values
+        # # Remove last atom
+        # del lig.atoms[max(lig.atoms)]
+        #
+        # # Get correct rotations for extension
+        # unit_v = hf.normaliser([c1 - c2 for c1, c2 in zip(rep_coor, closest_atom['coor'])])
+        # angle = hf.angle_checker(unit_v, [0, 0, 1])
+        # axis = np.cross(unit_v, [0, 0, 1])
+        # if round(np.linalg.norm(axis), 2) == 0:
+        #     axis = [1, 0, 0]
+        # rot_mat1 = hf.rotation_matrix([0, 0, 1], random_rotation)
+        # rot_mat2 = hf.rotation_matrix(axis, angle)
+        # # test for correct angle
+        # test_v = np.dot(rot_mat2, unit_v)
+        # if round(np.dot(test_v, unit_v), 2) != 1:
+        #     rot_mat2 = hf.rotation_matrix(axis, -angle)
+        #
+        # # Find atom of extension to connect to ligand
+        # for line in file_ext:
+        #     if line_number >= 2:
+        #         values_list = line.split()
+        #         ext_coor = [float(values_list[1]), float(values_list[2]), float(values_list[3])]
+        #         if ext_coor[0] == ext_coor[1] == ext_coor[2] == 0:
+        #             initial_length_ext = bond_len_dict[values_list[0]][closest_atom["element"]]
+        #             line_number = 0
+        #             file_ext.seek(0)
+        #             break
+        #     line_number += 1
+        #
+        # # Add all atoms in extension to ligand
+        # for line in file_ext:
+        #     if line_number == 0:
+        #         n_atoms_ext = int(float(line.strip()))
+        #     if line_number >= 2 and line_number < n_atoms_ext + 2:
+        #         values_list = line.split()
+        #         ext_coor = [float(values_list[1]), float(values_list[2]), float(values_list[3]) + initial_length_ext]
+        #         ext_coor = np.dot(rot_mat1, ext_coor)
+        #         ext_coor = np.dot(rot_mat2, ext_coor)
+        #         ext[id] = {
+        #                 "coor": [c1 + c2 for c1, c2 in zip(ext_coor, closest_atom["coor"])],
+        #                 "element": values_list[0]
+        #                 }
+        #     line_number += 1
+        #     id += 1
 
-        # Get correct rotations for extension
-        unit_v = hf.normaliser([c1 - c2 for c1, c2 in zip(rep_coor, closest_atom['coor'])])
-        angle = hf.angle_checker(unit_v, [0, 0, 1])
-        axis = np.cross(unit_v, [0, 0, 1])
-        if round(np.linalg.norm(axis), 2) == 0:
-            axis = [1, 0, 0]
-        rot_mat1 = hf.rotation_matrix([0, 0, 1], random_rotation)
-        rot_mat2 = hf.rotation_matrix(axis, angle)
-        # test for correct angle
-        test_v = np.dot(rot_mat2, unit_v)
-        if round(np.dot(test_v, unit_v), 2) != 1:
-            rot_mat2 = hf.rotation_matrix(axis, -angle)
-
-        # Find atom of extension to connect to ligand
-        for line in file_ext:
-            if line_number >= 2:
-                values_list = line.split()
-                ext_coor = [float(values_list[1]), float(values_list[2]), float(values_list[3])]
-                if ext_coor[0] == ext_coor[1] == ext_coor[2] == 0:
-                    initial_length_ext = hf.bond_reader(values_list[0], closest_atom["element"])
-                    line_number = 0
-                    file_ext.seek(0)
-                    break
-            line_number += 1
-
-        # Add all atoms in extension to ligand
-        for line in file_ext:
-            if line_number == 0:
-                n_atoms_ext = int(float(line.strip()))
-            if line_number >= 2 and line_number < n_atoms_ext + 2:
-                values_list = line.split()
-                ext_coor = [float(values_list[1]), float(values_list[2]), float(values_list[3]) + initial_length_ext]
-                ext_coor = np.dot(rot_mat1, ext_coor)
-                ext_coor = np.dot(rot_mat2, ext_coor)
-                ext[id] = {
-                        "coor": [c1 + c2 for c1, c2 in zip(ext_coor, closest_atom["coor"])],
-                        "x":    ext_coor[0] + closest_atom['x'],
-                        "y":    ext_coor[1] + closest_atom['y'],
-                        "z":    ext_coor[2] + closest_atom['z'],
-                        "element": values_list[0]
-                        }
-            line_number += 1
-            id += 1
-        lig.atoms = {**lig.atoms, **ext}
     return lig
+
+
+def extend_ligand(atom_dict, lig, extension):
+    path_ext = "../Ligands/" + extension
+    file_ext = open(path_ext, 'r')
+    id = max(lig) + 1
+    rep = lig[id - 1]
+    rep_coor = rep["coor"]
+    ext = {}
+    ext = hf.file2dict(file_ext, ext, id)
+    file_ext.close()
+    # Check for atom to connect extension to, will be closest atom
+    closest_atom = hf.closest_atom(lig, rep_coor)
+    base_atom_el = ext[hf.base_atom(ext)]["element"]
+    init_length_ext = bond_len_dict[base_atom_el][lig[closest_atom]["element"]]
+    # Remove last atom
+    del lig[max(lig)]
+
+    # Get correct rotations for extension
+    unit_v = hf.normaliser([c1 - c2 for c1, c2 in zip(rep_coor, lig[closest_atom]['coor'])])
+    angle = hf.angle_checker(unit_v, [0, 0, 1])
+    axis = np.cross(unit_v, [0, 0, 1])
+    if round(np.linalg.norm(axis), 2) == 0:
+        axis = [1, 0, 0]
+    rot_mat = hf.rotation_matrix(axis, angle)
+    # test for correct angle
+    test_v = np.dot(rot_mat, unit_v)
+    if round(np.dot(test_v, unit_v), 2) != 1:
+        print(np.dot(test_v, unit_v))
+        rot_mat = hf.rotation_matrix(axis, -angle)
+
+    # Add all atoms in extension to ligand
+    for atom, values in ext.items():
+        values["coor"][2] += init_length_ext
+        ext_coor = np.dot(rot_mat, values["coor"])
+        ext[id] = {
+                "coor": [c1 + c2 for c1, c2 in zip(ext_coor, lig[closest_atom]["coor"])],
+                "element": values["element"]
+                }
+        id += 1
+    return ext
 
 
 # Randomly choose a site to place ligand
@@ -543,9 +568,8 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
     original_ligand = ligand_type
     j = 0
     tried = []
-    print(cap)
     if extension:
-        print("\nPlacing " + ligand_type[:-4] + " + " + extension[:-4])
+        print("\nPlacing " + ligand_type[:-4] + " + " + str(extension))
     else:
         print("\nPlacing " + ligand_type[:-4])
     while j < n_ligands:
@@ -558,10 +582,10 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
         # Randomly choose site, get relevant info, don't pick site that has already been tried
         sites_list = list(sites).copy()
         remaining_sites = [x for x in sites_list if x not in tried]
-        print(len(remaining_sites))
         if len(remaining_sites) == 0:
             print("\nUnable to place more ligands of type " + str(original_ligand) + ". Placed " + str(j) + " out of " + str(n_ligands) + " requested ligands. Continuing with other types.\n")
-            retry = hf.y2true(input("Fail, try again? y/n: "))
+            # retry = hf.y2true(input("Fail, try again? y/n: "))
+            retry = True
             if retry:
                 print("Trying again...")
                 return 1
@@ -602,7 +626,6 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
             else:
                 angle = -hf.angle_checker(loc, [0, 0, 1])
             rot_mat = hf.rotation_matrix(axis, angle)
-            print(ligand_type)
 
             # Place ligand if possible, otherwise rotate
             while True:
@@ -610,20 +633,18 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
                 temp_atom_dict = {}
                 broken = False
                 min_dist_lig = math.inf
-                initial_length = hf.bond_reader(lig.base_element, atom_dict[loc_id]["element"])
-
-                for atom in lig.atoms:
+                initial_length = bond_len_dict[lig[hf.base_atom(lig)]["element"]][atom_dict[loc_id]["element"]]
+                for atom, lig_val in lig.items():
+                    lig_coor = copy.deepcopy(lig_val["coor"])
+                    lig_coor[2] += initial_length
                     # Rotate every atom in ligand according to random_rotation
-                    rotated_atom = np.dot(hf.rotation_matrix([0, 0, 1], random_rotation + extra_rotation), [lig.atoms[atom]['x'], lig.atoms[atom]['y'], lig.atoms[atom]['z'] + initial_length])
+                    rotated_atom = np.dot(hf.rotation_matrix([0, 0, 1], random_rotation + extra_rotation), lig_coor)
                     # Rotate in right direction
                     new_v = np.dot(rot_mat, rotated_atom)
                     atom_xyz = [c1 + c2 for c1, c2 in zip(new_v, loc_primary_xyz)]
-                    atom_element = lig.atoms[atom]['element']
+                    atom_element = lig[atom]['element']
                     temp_atom_dict[id] = {
                                     "coor": atom_xyz,
-                                    "x": atom_xyz[0],
-                                    "y": atom_xyz[1],
-                                    "z": atom_xyz[2],
                                     "element": atom_element,
                                     "type": "ligand",
                                     "ligand_type": ligand_type,
@@ -636,7 +657,7 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
                     # Check for overlap
                     if ligand_type != cap:
                         for test_atom, values in atom_dict.items():
-                            space = hf.bond_reader(atom_element, values["element"])
+                            space = bond_len_dict[atom_element][values["element"]] + buffer
                             if test_atom != loc_id:
                                 dist = hf.distance_checker(values["coor"], xyz_list[-1])
                                 if dist < space:
@@ -652,7 +673,7 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
                             for test_lig, values in atom_dict.items():
                                 if values["type"] == "ligand":
                                     dist = hf.distance_checker(values["coor"], [c1 + c2 for c1, c2 in zip(new_pos, loc_primary_xyz)])
-                                    bond_len_loc = hf.bond_reader(atom_element, values["element"])
+                                    bond_len_loc = bond_len_dict[atom_element][values["element"]]
                                     if dist < bond_len_loc + 0.3:
                                         if dist < min_dist_lig:
                                             min_dist_lig = dist
@@ -663,9 +684,6 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
                                     xyz_list = [c1 + c2 for c1, c2 in zip(new_pos, loc_primary_xyz)]
                                     temp_atom_dict[id-1] = {
                                                     "coor": xyz_list,
-                                                    "x": xyz_list[0],
-                                                    "y": xyz_list[1],
-                                                    "z": xyz_list[2],
                                                     "element": atom_element,
                                                     "type": "ligand",
                                                     "ligand_type": ligand_type,
@@ -707,7 +725,7 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
                             del sites[loc_id]
                         tried_loc = [loc]
                         ligand_type = cap
-                        lig = prep_ligand_file(atom_dict, cap, False, cap)
+                        lig = prep_ligand_file(atom_dict, cap, [False], cap)
                         j += 1
                         break
                 else:
@@ -790,7 +808,7 @@ def place_bridge_ligands(atom_dict, sites, bridge_dict, bridge_ligand):
         # This is only correct for crystal with one kind of atom
         lig = prep_ligand_file(atom_dict, "/DB_Ligands/" + bridge_ligand + ".xyz", False)
         try:
-            initial_length = math.sqrt(hf.bond_reader(lig.base_element, "Si")  - (3.84/2)**2)
+            initial_length = math.sqrt(bond_len_dict[lig.base_element]["Si"]  - (3.84/2)**2)
         except ValueError:
             initial_length = 0
         # Get correct rotation for ligand relative to site
@@ -846,7 +864,7 @@ def place_bridge_ligands(atom_dict, sites, bridge_dict, bridge_ligand):
                 xyz_list.append(atom_xyz)
                 id += 1
                 for test_atom, values2 in atom_dict.items():
-                    space = hf.bond_reader(atom_element, values2["element"])
+                    space = bond_len_dict[atom_element][values2["element"]]
                     # Stay further away from the crystal atoms
                     if values2['type'] == "crystal":
                         space = space + 0.25
@@ -860,15 +878,16 @@ def place_bridge_ligands(atom_dict, sites, bridge_dict, bridge_ligand):
 
 
 if __name__ == "__main__":
+    # Having a global dict with bonding lengths improves speed a lot
+    global bond_len_dict
+    bond_len_dict = hf.csv2dict("bonding_distances.csv")
     build = hf.y2true(input("Create new crystal (y) or use existing file (n)?: "))
     if build:
-        structure = input("Specify structure type: ")
         a = float(input("Specify lattice constant (in Ångström): "))
         atom_a = input("Element for first element type: ")
         atom_b = input("Element for second element type: ")
         diameter = float(input("Diameter of quantum dot (in unit cells): "))
-        filename = input("Write to file: ")
-        atom_dict = crystal_builder(structure, a, atom_a, atom_b, diameter, filename)
+        atom_dict = crystal_builder(a, atom_a, atom_b, diameter)
     else:
         crystal_file = input("Crystal file to use (don't write the file extension): ") + ".xyz"
         atom_dict = crystal_reader(crystal_file)

@@ -1,8 +1,17 @@
+import math
+import numpy as np
 
-l = 1
-j = 1.5
-s = 0.5
+dict = {
+    "H": 0,
+    "C": 0,
+    "Si": 0
+}
 
-
-g = 1 + (j*(j+1) - l * (l + 1) + s * (s+1))/(2*j*(j+1))
-print(g)
+file = open("relaxed.xyz", 'r')
+i = 0
+for line in file:
+    if i > 1:
+        element = line.split()[0]
+        dict[element] += 1
+    i += 1
+print(dict)

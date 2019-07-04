@@ -37,12 +37,14 @@ class fcc(object):
 
 
 class zns(object):
+    """Creates a zincblende or diamond cubic unit cell with lattice constant a
+    and elements atom_a and atom_b"""
     def __init__(self, a, atom_a, atom_b):
         self.a = a
         self.atom_a = atom_a
         self.atom_xyz = []
         xyz_pre = []
-
+        # Find coordinates according to x = y = z (mod 2), and x + y + z = 0 or 1 (mod 4)
         for x in range(5):
             for y in range(5):
                 for z in range(5):
@@ -60,6 +62,7 @@ class zns(object):
                             xyz_pre.append([x, y + 4, z])
                         elif z == 0:
                             xyz_pre.append([x, y, z + 4])
+        # Find coordinates of atom_b
         for atom in xyz_pre:
             if 3 in atom:
                 xyz = [atom_b]
