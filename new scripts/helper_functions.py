@@ -2,6 +2,7 @@ import math
 import numpy as np
 import sys
 import csv
+import os
 
 
 def distance_checker(xyz1, xyz2):
@@ -74,7 +75,7 @@ def bond_checker(atom, dict, bond_dict):
     """Check for all atoms in bonding range"""
     bound = []
     for item, values in dict.items():
-        bond_range = bond_reader(atom[0], values["element"]) + 0.1
+        bond_range = bond_reader(atom[0], values["element"]) + 0.2
         if distance_checker(atom[1:], values["coor"]) <= bond_range:
             bound.append(item)
     return bound
@@ -89,6 +90,17 @@ def closest_atom(dict, coor):
             min_dis = dis
             min_id = atom
     return min_id
+
+
+def print_lig():
+    """ Prints available ligands """
+    lig_list = os.listdir("../Ligands")
+    print()
+    for ligs in lig_list:
+        # Skip folders
+        if ligs[-4:] == ".xyz":
+            print(ligs[:-4])
+    print()
 
 
 def file2dict(file, dict, start_id):
@@ -113,6 +125,23 @@ def file2dict(file, dict, start_id):
             id += 1
         line_number += 1
     return dict
+
+
+def dict2file(dict, filename, foldername):
+    if foldername:
+        if not os.path.exists("../Created_QD/" + foldername):
+            os.makedirs("../Created_QD/" + foldername)
+        file = open("../Created_QD/" + foldername + "/" + filename + ".xyz", "w")
+    else:
+        file = open("../Created_QD/" + filename + ".xyz", "w")
+    file.write("        \n\n")
+    for atom, values in dict.items():
+        file.write(values['element'] + "\t" + str(values['coor'][0]) + "\t\t" +
+                   str(values['coor'][1]) + "\t\t" + str(values['coor'][2]) + "\n")
+    file.seek(0)
+    file.write(str(len(dict)))
+    file.close()
+    print("\nQuantum Dot created :)")
 
 
 def base_atom(dict):

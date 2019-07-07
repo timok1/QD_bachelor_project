@@ -1,11 +1,12 @@
-import unit_cells
+# Timo Koster
 import numpy as np
 import math
 import random
-import os
-import helper_functions as hf
 import copy
 import sys
+
+import helper_functions as hf
+import unit_cells
 
 
 def crystal_builder(a, atom_a, atom_b, diameter):
@@ -120,114 +121,161 @@ def crystal_reader(filename):
     return atom_dict
 
 
-def builder(atom_dict):
-    foldername = input("Save in folder (or main): ")
-    if foldername == "main":
-        foldername = False
-    filename = input("Write to file: ")
-    sites = tetra_sites(atom_dict)
-    n_sites = len(sites)
-
-    # Get ligand parameters
-    ligand_types = []
-    coverage_list = []
-    n_ligands_list = []
-    extension_list = []
-    lig_dict = {}
-    i = 0
-
-    # Get a series of ligands to add to crystal
-    series_b = hf.y2true(input("Add a series of ligands (y), or add them one by one(n)?: "))
+def series_lig(atom_dict, sites, foldername):
+    """
+    Obtains the lig_dict containing the values of the ligands to be added to
+    the quantum dot. Here this is done by combining all 'bases' and extensions
+    with eachother. e.g. when you put in C10H21 and C9H19 as bases, and COOH
+    and NH2 as extensions you'll get C10H21 + COOH, C10H21 + NH2, C9H19 + COOH
+    C9H19 + NH2
+    """
     base_list = []
     ext_list = []
-    if series_b:
-        while True:
-            base = input("Add ligand to base list, or type 'done': ")
-            if base == 'done':
-                break
-            base_list.append(base + ".xyz")
-        while True:
-            ext = input("Add extension to extension list, or type 'none', or 'done': ")
-            if ext == 'done':
-                break
-            if ext == 'none':
-                ext_list.append([False])
-            else:
-                ext_list.append([ext + ".xyz"])
-                extra_ext = input("Further extension to extension, or type n: ")
-                if extra_ext != 'n':
-                    ext_list[-1].append(extra_ext + ".xyz")
-        coverage = float(input("Coverage (fraction): "))
-        lig_dict[0] = {
-                "ligand_type": base_list[0],
-                "extension": [ext_list[0]],
-                "coverage": coverage,
-                "n_ligands": round(coverage * n_sites)
-        }
-        cap = input("Cap remaining sites with (single atom): ") + ".xyz"
-        lig_dict[1] = {
-                "ligand_type": cap,
-                "extension": [False],
-                "coverage": 1,
-                "n_ligands": n_sites
-            }
+    lig_dict = {}
+    n_sites = len(sites)
+    sites_copy = copy.deepcopy(sites)
+    # Obtain bases of ligands
+    while True:
+        base = input("Add ligand to base list, or type 'files' to show available ligands, or type 'done': ")
+        if base == 'files':
+            hf.print_lig()
+        if base == 'done':
+            break
+        base_list.append(base + ".xyz")
+    # Obtain extensions
+    while True:
+        ext = input("Add extension to extension list, or type 'none', or 'done': ")
+        if ext == 'done':
+            break
+        if ext == 'none':
+            ext_list.append([False])
+        # Extend extensions
+        else:
+            ext_list.append([ext + ".xyz"])
+            extra_ext = input("Further extension to extension, or type n: ")
+            if extra_ext != 'n':
+                ext_list[-1].append(extra_ext + ".xyz")
 
-    # Add ligands one by one
-    else:
-        while True:
-            ligand_file = input("Filename of ligand to be added, or type files to see available ligands: ") + ".xyz"
-            # Print available ligands
-            if ligand_file[:-4] == "files":
-                lig_list = os.listdir("../Ligands")
-                print()
-                for ligs in lig_list:
-                    # Skip folders
-                    if ligs[-4:] == ".xyz":
-                        print(ligs[:-4])
-                print()
-                ligand_file = input("Filename of ligand to be added: ") + ".xyz"
-            ligand_types.append(ligand_file)
-            extend = hf.y2true(input("Extend ligand? Note: this replaces the last atom in the ligand file. y/n: "))
-            if extend:
-                extension_list.append([input("Extend with: ") + ".xyz"])
-                extra_ext = input("Further extension to extension, or type n: ")
-                if extra_ext != 'n':
-                    extension_list[-1].append(extra_ext  + ".xyz")
-            else:
-                extension_list.append([False])
-            coverage = float(input("Coverage (fraction): "))
-            coverage_list.append(coverage)
-            n_ligands_list.append(round(coverage * n_sites))
-            lig_dict[i] = {
-                    "ligand_type": ligand_file,
-                    "extension": extension_list[-1],
-                    "coverage": coverage,
-                    "n_ligands": round(coverage * n_sites)
-            }
-            i += 1
-            more = hf.y2true(input("Add another type? y/n: "))
-            if not more:
-                cap = input("Cap remaining sites with (single atom): ") + ".xyz"
-                lig_dict[i] = {
+    coverage = float(input("Coverage (fraction): "))
+    cap = input("Cap remaining sites with (single atom): ") + ".xyz"
+    sec_buffer = float(input("Buffer size (Angstrom)? Distance between ligands will be at least bonding length + buffer: "))
+    buffer = float(input("Initial buffer (Buffer for first QD. Helps create space for later QD's): "))
+    atom_dict_copy = copy.deepcopy(atom_dict)
+    i = 0
+
+    # Create all quantum dots
+    for base in base_list:
+        print(base)
+        for extension in ext_list:
+            filename = base[:-4]
+            for item in extension:
+                if item is not False:
+                    filename += "+" + item[:-4]
+            # Create first quantum dot
+            if i == 0:
+                lig_dict[0] = {
+                        "ligand_type": base,
+                        "extension": extension,
+                        "coverage": coverage,
+                        "n_ligands": round(coverage * n_sites)
+                }
+
+                lig_dict[1] = {
                         "ligand_type": cap,
                         "extension": [False],
                         "coverage": 1,
                         "n_ligands": n_sites
-                }
-                break
-    buffer = float(input("Buffer size (Angstrom)? Distance between ligands will be at least bonding length + buffer: "))
-    if series_b:
-        sec_buffer = buffer
-        buffer = float(input("Initial buffer (Buffer for first QD. Helps create space for later QD's): "))
+                    }
+                while True:
+                    stopped = False
+                    for ligand, values in lig_dict.items():
+                        atom_dict = place_ligands(atom_dict, values, sites, buffer, False, cap)
+                        # Detect failure to place all ligands
+                        if atom_dict == 1:
+                            atom_dict = copy.deepcopy(atom_dict_copy)
+                            sites = copy.deepcopy(sites_copy)
+                            stopped = True
+                            break
+                    if not stopped:
+                        i += 1
+                        buffer = sec_buffer
+                        hf.dict2file(atom_dict, filename, foldername)
+                        break
+            # Replace ligands
+            else:
+                sites = sites_copy.copy()
+                input_rep = [base, extension]
+                replaced = replace_ligands(atom_dict, lig_dict, cap, sites, buffer, input_rep, filename, foldername)
+                atom_dict = replaced[0]
+                lig_dict = replaced[1]
+    # Allow for more replacements
+    while True:
+        replacement_ligands = hf.y2true(input("Replace ligands to create new quantum dot? y/n: "))
+        if replacement_ligands:
+            sites = sites_copy.copy()
+            filename = input("Write to file: ")
+            buffer = float(input("Buffer: "))
+            replaced = replace_ligands(atom_dict, lig_dict, cap, sites, buffer, False, filename, foldername)
+            atom_dict = replaced[0]
+            lig_dict = replaced[1]
+        else:
+            break
 
-    # Copy sites to use again later
+
+def single_qd(atom_dict, sites, foldername):
+    """
+    Create a single quantum dot and allow for replacement of ligands for a new
+    one.
+    """
+    filename = input("Save QD as: ")
+    i = 0
+    lig_list = []
+    extension_list = []
+    coverage_list = []
+    n_ligands_list = []
+    lig_dict = {}
+    n_sites = len(sites)
+    # Get all ligands
+    while True:
+        ligand_file = input("Filename of ligand to be added, or type files to see available ligands: ") + ".xyz"
+        # Print available ligands
+        if ligand_file[:-4] == "files":
+            hf.print_lig()
+            ligand_file = input("Filename of ligand to be added: ") + ".xyz"
+        lig_list.append(ligand_file)
+        extend = hf.y2true(input("Extend ligand? Note: this replaces the last atom in the ligand file. y/n: "))
+        if extend:
+            extension_list.append([input("Extend with: ") + ".xyz"])
+            extra_ext = input("Further extension to extension, or type n: ")
+            if extra_ext != 'n':
+                extension_list[-1].append(extra_ext  + ".xyz")
+        else:
+            extension_list.append([False])
+        coverage = float(input("Coverage (fraction): "))
+        coverage_list.append(coverage)
+        n_ligands_list.append(round(coverage * n_sites))
+        lig_dict[i] = {
+                "ligand_type": ligand_file,
+                "extension": extension_list[-1],
+                "coverage": coverage,
+                "n_ligands": round(coverage * n_sites)
+        }
+        i += 1
+        more = hf.y2true(input("Add another type? y/n: "))
+        if not more:
+            cap = input("Cap remaining sites with (single atom): ") + ".xyz"
+            lig_dict[i] = {
+                    "ligand_type": cap,
+                    "extension": [False],
+                    "coverage": 1,
+                    "n_ligands": n_sites
+            }
+            break
+
+    buffer = float(input("Buffer (Angstrom) (distance between ligands will be at least buffer + bonding length): "))
     sites_copy = copy.deepcopy(sites)
-    bridge_bool = False #input("Allow bridges (work in progress)? y/n: ")
-    if bridge_bool:
-        atom_dict = bridges(atom_dict, sites)
-
     atom_dict_copy = copy.deepcopy(atom_dict)
-    # lig_dict_copy = copy.deepcopy(lig_dict)
+    # Place ligands
     while True:
         stopped = False
         for ligand, values in lig_dict.items():
@@ -239,91 +287,78 @@ def builder(atom_dict):
                 break
         if not stopped:
             break
-    # Write atoms to file
-    if series_b:
-        dict2file(atom_dict, filename + base_list[0][:-4] + "+" + ext_list[0][:-4], foldername)
-    else:
-        dict2file(atom_dict, filename, foldername)
+    hf.dict2file(atom_dict, filename, foldername)
 
-    # Replace ligands to create new QD
-    if series_b:
-        buffer = sec_buffer
-        count = 0
-        for bas in base_list:
-            for ext in ext_list:
-                if count == 0:
-                    count += 1
-                    continue
-                # atom_dict = copy.deepcopy(atom_dict_copy)
-                # lig_dict = copy.deepcopy(lig_dict_copy)
-                sites = sites_copy.copy()
-                inp_rep = [bas, ext]
-                if not ext:
-                    filename_rep = filename + bas[:-4]
-                else:
-                    filename_rep = filename + bas[:-4] + "+" + ext[:-4]
-                replaced = replace_ligands(atom_dict, lig_dict, cap, sites, buffer, inp_rep, filename_rep, foldername)
-                atom_dict = replaced[0]
-                lig_dict = replaced[1]
-
-
+    # Replace ligands
     while True:
         replacement_ligands = hf.y2true(input("Replace ligands to create new quantum dot? y/n: "))
         if replacement_ligands:
             sites = sites_copy.copy()
-            filename_rep = input("Write to file: ")
+            filename = input("Write to file: ")
             buffer = float(input("Buffer: "))
-            replaced = replace_ligands(atom_dict, lig_dict, cap, sites, buffer, False, filename_rep, foldername)
+            replaced = replace_ligands(atom_dict, lig_dict, cap, sites, buffer, False, filename, foldername)
             atom_dict = replaced[0]
             lig_dict = replaced[1]
         else:
             break
 
 
-# Replace ligands in QD with new ligands
-def replace_ligands(atom_dict, lig_dict, cap, sites, buffer, inp_rep, filename, foldername):
+def replace_ligands(atom_dict, lig_dict, cap, sites, buffer, input_rep, filename, foldername):
+    """
+    Takes in an atom dict with ligands and replaces the ligands by the
+    requested replacements, saves it to a new quantum dot and returns the
+    new atom dict.
+    """
     replacement_list = []
     rep_ext_list = []
     loc_dict = {cap[:-4]: []}
     rep_dict = copy.deepcopy(lig_dict)
     lig_dict_inv = {}
+    # Store the replacements and replacee's in the right way
     for ligand, lig_val in lig_dict.items():
         if lig_val["ligand_type"] != cap:
-            if inp_rep:
-                replacement_list = [inp_rep[0]]
-                rep_ext_list = [inp_rep[1]]
+            # Use existing input
+            if input_rep:
+                replacement_list = [input_rep[0]]
+                rep_ext_list = [input_rep[1]]
                 rep_dict[ligand]["extension"] = rep_ext_list[-1]
+            # Get new input
             else:
                 replacement_list.append(input("Replace " + lig_val["ligand_type"] + " with: ") + ".xyz")
                 extend = hf.y2true(input("Extend ligand? y/n: "))
                 if extend:
-                    rep_ext_list.append(input("Extend with: ") + ".xyz")
+                    rep_ext_list.append([input("Extend with: ") + ".xyz"])
                     rep_dict[ligand]["extension"] = rep_ext_list[-1]
                 else:
                     rep_ext_list.append([False])
                     rep_dict[ligand]["extension"] = [False]
+            # Store info in dict
             loc_dict[ligand] = {
                                 "loc_id": [],
                                 "replacement": replacement_list[-1]
                             }
             rep_dict[ligand]["ligand_type"] = replacement_list[-1]
             rep_dict[ligand]["loc_info"] = {}
-
+            # Reverses key and value
             lig_dict_inv[lig_val["ligand_type"]] = ligand
 
+    # Get info on all atoms that need to be deleted, and get the relevant info
+    # of the replacee's
     atom_del_list = []
     for atom, at_values in atom_dict.items():
         if at_values["type"] == 'ligand':
             atom_del_list.append(atom)
             if at_values["ligand_type"] != cap:
                 rep_dict[lig_dict_inv[at_values["ligand_type"]]]["loc_info"][at_values["loc_id"]] = {
-                    "loc": at_values["loc"],
+                    "loc_vec": at_values["loc_vec"],
                     "rotation": at_values["rotation"]
                 }
+
     rep_dict_copy = copy.deepcopy(rep_dict)
     atom_dict_copy = copy.deepcopy(atom_dict)
     sites_copy = copy.deepcopy(sites)
     done = False
+    # Actually delete and replace
     while not done:
         for item in atom_del_list:
             del atom_dict[item]
@@ -336,31 +371,18 @@ def replace_ligands(atom_dict, lig_dict, cap, sites, buffer, inp_rep, filename, 
                 break
             else:
                 done = True
-
-    dict2file(atom_dict, filename, foldername)
+    hf.dict2file(atom_dict, filename, foldername)
 
     return atom_dict, rep_dict
 
 
-def dict2file(dict, filename, foldername):
-    if foldername:
-        if not os.path.exists("../Created_QD/" + foldername):
-            os.makedirs("../Created_QD/" + foldername)
-        file = open("../Created_QD/" + foldername + "/" + filename + ".xyz", "w")
-    else:
-        file = open("../Created_QD/" + filename + ".xyz", "w")
-    file.write("        \n\n")
-    for atom, values in dict.items():
-        file.write(values['element'] + "\t" + str(values['coor'][0]) + "\t\t" +
-                   str(values['coor'][1]) + "\t\t" + str(values['coor'][2]) + "\n")
-    file.seek(0)
-    file.write(str(len(dict)))
-    file.close()
-    print("\nQuantum Dot created :)")
-
-
-# Calculate all sites for ligands for tetrahedral structure
 def tetra_sites(dict):
+    """
+    Takes in the atom_dict, and determines all possible connection sites for a
+    tetrahedral structure. Returns a dict with the atom they connect to as a
+    key, that atom's coordinates, and a unit vector from that atom in the
+    direction of the site.
+    """
     # Create a standard tetrahedron to determine sites
     x = 1 / math.sqrt(3)
     sites = {}
@@ -379,16 +401,18 @@ def tetra_sites(dict):
 
             # line up first vector
             axis = np.cross(tetrahedron[0], connection_list[0])
+            # Check if already lined up
             if round(np.linalg.norm(axis), 2) == 0:
                 axis = [0, x, -x]
                 angle = 0
+                # check if opposite
                 if round(np.dot(tetrahedron[0], connection_list[0]), 2) == -1:
                     angle = math.pi
             else:
                 angle = hf.angle_checker(tetrahedron[0], connection_list[0])
             rot_mat = hf.rotation_matrix(axis, angle)
-            for k in range(4):
-                tetrahedron[k] = list(np.dot(rot_mat, tetrahedron[k]))
+            for i in range(4):
+                tetrahedron[i] = list(np.dot(rot_mat, tetrahedron[i]))
 
             # line up second vector
             axis = tetrahedron[0]
@@ -396,8 +420,8 @@ def tetra_sites(dict):
             if len(connection_list) == 1:
                 angle = random.random() * 2 * math.pi
                 rot_mat = hf.rotation_matrix(axis, angle)
-                for k in range(4):
-                    tetrahedron[k] = list(np.around(np.array(np.dot(rot_mat, tetrahedron[k])), 4))
+                for i in range(4):
+                    tetrahedron[i] = list(np.around(np.array(np.dot(rot_mat, tetrahedron[i])), 4))
                 sites[id] = {
                             'primary_xyz': primary_xyz,
                             'sites_xyz': [tetrahedron[1], tetrahedron[2], tetrahedron[3]]}
@@ -405,24 +429,26 @@ def tetra_sites(dict):
             # No rotation if already aligned
             elif round(np.dot(tetrahedron[1], connection_list[1]), 2) == 1:
                 angle = 0
-            # Get angle between planes spanned by first vector, second connection vector and second vector in tetrahedron
+            # Get angle between planes spanned by first vector, second
+            # connection vector and second vector in tetrahedron
             else:
                 normal_1 = np.cross(tetrahedron[0], connection_list[1])
                 normal_2 = np.cross(tetrahedron[0], tetrahedron[1])
                 angle = hf.angle_checker(normal_1, normal_2)
 
-            # Make sure rotation is in right direction
+            # Make sure rotation is in right direction, as angle checker gives
+            # absolute angle
             test_rot_mat = hf.rotation_matrix(axis, angle)
-            testrahedron = tetrahedron.copy()
+            test_rahedron = tetrahedron.copy()
             for test in range(4):
-                testrahedron[test] = list(np.dot(test_rot_mat, tetrahedron[test]))
-            if round(np.dot(connection_list[1], testrahedron[1]), 1) != 1:
+                test_rahedron[test] = list(np.dot(test_rot_mat, tetrahedron[test]))
+            if round(np.dot(connection_list[1], test_rahedron[1]), 1) != 1:
                 angle = -angle
 
             # Rotate tetrahedron to correct orientation, add points without atom to sites
             rot_mat = hf.rotation_matrix(axis, angle)
-            for k in range(4):
-                tetrahedron[k] = list(np.around(np.array(np.dot(rot_mat, tetrahedron[k])), 4))
+            for i in range(4):
+                tetrahedron[i] = list(np.around(np.array(np.dot(rot_mat, tetrahedron[i])), 4))
             if len(values['bound']) == 2:
                 sites[id] = {
                             'primary_xyz': primary_xyz,
@@ -440,7 +466,7 @@ def tetra_sites(dict):
 
 
 def prep_ligand_file(atom_dict, ligand_type, extension, cap):
-    """Read ligand file, possibly extend with another ligand and add to an object"""
+    """Read ligand file, possibly extend with another ligand and add to a dict"""
 
     path = "../Ligands/" + ligand_type
     file = open(path, 'r')
@@ -453,71 +479,15 @@ def prep_ligand_file(atom_dict, ligand_type, extension, cap):
     # Extend ligand if needed
     if extension[0] is not False and ligand_type != cap:
         for item in extension:
-            ext = extend_ligand(atom_dict, lig, item)
-            lig = {**lig, **ext}
-        # path_ext = "../Ligands/" + extension
-        # file_ext = open(path_ext, 'r')
-        # line_number = 0
-        # # Maybe use this later
-        # random_rotation = random.random() * 2 * math.pi * 0
-        # rep = lig.atoms[max(lig.atoms)]
-        # rep_coor = rep["coor"]
-        # min_dist = math.inf
-        # ext = {}
-        # # Check for atom to connect extension to
-        # for atom, values in lig.atoms.items():
-        #     dist = hf.distance_checker(rep_coor, values["coor"])
-        #     if dist < min_dist and dist != 0:
-        #         min_dist = dist
-        #         closest_atom = values
-        # # Remove last atom
-        # del lig.atoms[max(lig.atoms)]
-        #
-        # # Get correct rotations for extension
-        # unit_v = hf.normaliser([c1 - c2 for c1, c2 in zip(rep_coor, closest_atom['coor'])])
-        # angle = hf.angle_checker(unit_v, [0, 0, 1])
-        # axis = np.cross(unit_v, [0, 0, 1])
-        # if round(np.linalg.norm(axis), 2) == 0:
-        #     axis = [1, 0, 0]
-        # rot_mat1 = hf.rotation_matrix([0, 0, 1], random_rotation)
-        # rot_mat2 = hf.rotation_matrix(axis, angle)
-        # # test for correct angle
-        # test_v = np.dot(rot_mat2, unit_v)
-        # if round(np.dot(test_v, unit_v), 2) != 1:
-        #     rot_mat2 = hf.rotation_matrix(axis, -angle)
-        #
-        # # Find atom of extension to connect to ligand
-        # for line in file_ext:
-        #     if line_number >= 2:
-        #         values_list = line.split()
-        #         ext_coor = [float(values_list[1]), float(values_list[2]), float(values_list[3])]
-        #         if ext_coor[0] == ext_coor[1] == ext_coor[2] == 0:
-        #             initial_length_ext = bond_len_dict[values_list[0]][closest_atom["element"]]
-        #             line_number = 0
-        #             file_ext.seek(0)
-        #             break
-        #     line_number += 1
-        #
-        # # Add all atoms in extension to ligand
-        # for line in file_ext:
-        #     if line_number == 0:
-        #         n_atoms_ext = int(float(line.strip()))
-        #     if line_number >= 2 and line_number < n_atoms_ext + 2:
-        #         values_list = line.split()
-        #         ext_coor = [float(values_list[1]), float(values_list[2]), float(values_list[3]) + initial_length_ext]
-        #         ext_coor = np.dot(rot_mat1, ext_coor)
-        #         ext_coor = np.dot(rot_mat2, ext_coor)
-        #         ext[id] = {
-        #                 "coor": [c1 + c2 for c1, c2 in zip(ext_coor, closest_atom["coor"])],
-        #                 "element": values_list[0]
-        #                 }
-        #     line_number += 1
-        #     id += 1
-
+            lig = extend_ligand(atom_dict, lig, item)
     return lig
 
 
 def extend_ligand(atom_dict, lig, extension):
+    """
+    Takes a ligand dict, removes the last atom and adds all atoms in the
+    requested extension in the righ orientation. Returns a new ligand dict.
+    """
     path_ext = "../Ligands/" + extension
     file_ext = open(path_ext, 'r')
     id = max(lig) + 1
@@ -543,7 +513,6 @@ def extend_ligand(atom_dict, lig, extension):
     # test for correct angle
     test_v = np.dot(rot_mat, unit_v)
     if round(np.dot(test_v, unit_v), 2) != 1:
-        print(np.dot(test_v, unit_v))
         rot_mat = hf.rotation_matrix(axis, -angle)
 
     # Add all atoms in extension to ligand
@@ -555,11 +524,17 @@ def extend_ligand(atom_dict, lig, extension):
                 "element": values["element"]
                 }
         id += 1
-    return ext
+    lig = {**lig, **ext}
+    return lig
 
 
-# Randomly choose a site to place ligand
 def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
+    """
+    Adds the requested amount of ligands at random sites, returns updated
+    atom_dict.
+    """
+    # Sorry for the length of this function, should probably be broken up in
+    # multiple functions.
     ligand_type = lig_info["ligand_type"]
     n_ligands = lig_info["n_ligands"]
     extension = lig_info["extension"]
@@ -568,10 +543,18 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
     original_ligand = ligand_type
     j = 0
     tried = []
-    if extension:
-        print("\nPlacing " + ligand_type[:-4] + " + " + str(extension))
+    # Print which ligands are being placed
+    if extension and extension[0] is not False:
+        ex_string = ''
+        for x in extension:
+            if x is not False:
+                ex_string += x[:-4] + ' + '
+        ex_string = ex_string[:-3]
+        print("\nPlacing " + ligand_type[:-4] + " + " + ex_string)
     else:
         print("\nPlacing " + ligand_type[:-4])
+
+    # Add ligands until done
     while j < n_ligands:
         # preventive in case of rounding errors
         if len(sites) == 0:
@@ -582,20 +565,22 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
         # Randomly choose site, get relevant info, don't pick site that has already been tried
         sites_list = list(sites).copy()
         remaining_sites = [x for x in sites_list if x not in tried]
+
         if len(remaining_sites) == 0:
-            print("\nUnable to place more ligands of type " + str(original_ligand) + ". Placed " + str(j) + " out of " + str(n_ligands) + " requested ligands. Continuing with other types.\n")
-            # retry = hf.y2true(input("Fail, try again? y/n: "))
-            retry = True
+            print("\nUnable to place more ligands of type " + str(original_ligand) + ". Placed "
+                  + str(j) + " out of " + str(n_ligands) + " requested ligands.\n")
+            retry = hf.y2true(input("Try again (y), or continue (n)?: "))
             if retry:
                 print("Trying again...")
                 return 1
             break
-        # Use predetermined sites
+        # Use predetermined sites if required, "loc" variables refer to
+        # connection site and its primary atom
         if fixed_loc and ligand_type != cap:
             if len(lig_info["loc_info"]) == 0:
                 break
             loc_id = random.choice(list(lig_info["loc_info"]))
-            loc = lig_info["loc_info"][loc_id]["loc"]
+            loc_vec = lig_info["loc_info"][loc_id]["loc_vec"]
             loc_sites = copy.deepcopy(sites[loc_id]['sites_xyz'])
             random_rotation = lig_info["loc_info"][loc_id]["rotation"]
             del lig_info["loc_info"][loc_id]
@@ -603,28 +588,29 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
         else:
             loc_id = random.choice(remaining_sites)
             loc_sites = sites[loc_id]['sites_xyz'].copy()
-            loc = random.choice(loc_sites)
+            loc_vec = random.choice(loc_sites)
             random_rotation = random.random() * 2 * math.pi
         loc_primary_xyz = sites[loc_id]['primary_xyz']
-        tried_loc = []
+        tried_loc_vec = []
         lig = prep_ligand_file(atom_dict, ligand_type, extension, cap)
         stop = False
 
         # Loop over every site connected to chosen atom
         while True:
-            for vec in tried_loc:
-                if hf.distance_checker(vec, loc) < 0.001:
+            # Make sure you don't try same loc_vec twice
+            for vec in tried_loc_vec:
+                if hf.distance_checker(vec, loc_vec) < 0.001:
                     stop = True
             if stop:
                 break
             # Get correct rotation for ligand relative to site
-            axis = np.cross(loc, [0, 0, 1])
+            axis = np.cross(loc_vec, [0, 0, 1])
             # Prevent dividing by 0 when vectors are already lined up
             if np.linalg.norm(axis) == 0:
                 axis = [1, 0, 0]
                 angle = 0
             else:
-                angle = -hf.angle_checker(loc, [0, 0, 1])
+                angle = -hf.angle_checker(loc_vec, [0, 0, 1])
             rot_mat = hf.rotation_matrix(axis, angle)
 
             # Place ligand if possible, otherwise rotate
@@ -639,7 +625,7 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
                     lig_coor[2] += initial_length
                     # Rotate every atom in ligand according to random_rotation
                     rotated_atom = np.dot(hf.rotation_matrix([0, 0, 1], random_rotation + extra_rotation), lig_coor)
-                    # Rotate in right direction
+                    # Rotate in right direction (with respect to crystal)
                     new_v = np.dot(rot_mat, rotated_atom)
                     atom_xyz = [c1 + c2 for c1, c2 in zip(new_v, loc_primary_xyz)]
                     atom_element = lig[atom]['element']
@@ -649,7 +635,7 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
                                     "type": "ligand",
                                     "ligand_type": ligand_type,
                                     "loc_id": loc_id,
-                                    "loc": loc,
+                                    "loc_vec": loc_vec,
                                     "rotation": random_rotation + extra_rotation
                                     }
                     xyz_list.append(atom_xyz)
@@ -663,8 +649,7 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
                                 if dist < space:
                                     broken = True
                                     break
-                            if broken:
-                                break
+                    # Check for overlap when capping, use different rotation
                     if ligand_type == cap:
                         new_pos = new_v.copy()
                         changed = False
@@ -674,6 +659,7 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
                                 if values["type"] == "ligand":
                                     dist = hf.distance_checker(values["coor"], [c1 + c2 for c1, c2 in zip(new_pos, loc_primary_xyz)])
                                     bond_len_loc = bond_len_dict[atom_element][values["element"]]
+                                    # Sorry for magic number
                                     if dist < bond_len_loc + 0.3:
                                         if dist < min_dist_lig:
                                             min_dist_lig = dist
@@ -688,9 +674,10 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
                                                     "type": "ligand",
                                                     "ligand_type": ligand_type,
                                                     "loc_id": loc_id,
-                                                    "loc": loc
+                                                    "loc_vec": loc_vec
                                                     }
                                 break
+                            # Rotate away from closest atom
                             vec_closest_element = [c1 - c2 for c1, c2 in zip(min_dist_lig_coor, loc_primary_xyz)]
                             axis = np.cross(vec_closest_element, new_pos)
                             angle = 0.1
@@ -713,7 +700,7 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
                     elif extra_rotation > math.pi * 2:
                         extra_rotation = 0
                         tried.append(loc_id)
-                        tried_loc.append(loc)
+                        tried_loc_vec.append(loc_vec)
                         fail_bool = True
                         break
                     # Merge dicts if no collision
@@ -723,7 +710,7 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
                             print(str(j) + " ligands added")
                         if loc_id in sites:
                             del sites[loc_id]
-                        tried_loc = [loc]
+                        tried_loc_vec = [loc_vec]
                         ligand_type = cap
                         lig = prep_ligand_file(atom_dict, cap, [False], cap)
                         j += 1
@@ -732,21 +719,21 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
                     atom_dict = {**atom_dict, **temp_atom_dict}
                     if loc_id in sites:
                         del sites[loc_id]
-                    tried_loc.append(loc)
+                    tried_loc_vec.append(loc_vec)
                     break
             # Add final ligand type to remaining sites at chosen atom
             try:
-                loc = loc_sites[(loc_sites.index(loc) + 1) % len(loc_sites)]
+                loc_vec = loc_sites[(loc_sites.index(loc_vec) + 1) % len(loc_sites)]
             except ValueError:
                 min_dist = math.inf
                 loc_index = 0
                 for item in loc_sites:
-                    distance = hf.distance_checker(loc, item)
+                    distance = hf.distance_checker(loc_vec, item)
                     if distance < min_dist:
                         min_dist = distance
                         loc_index_min = loc_index
                     loc_index += 1
-                loc = loc_sites[(loc_index_min + 1) % len(loc_sites)]
+                loc_vec = loc_sites[(loc_index_min + 1) % len(loc_sites)]
 
     # Detect failure to place all requested ligands if replacing
     if fixed_loc and fail_bool:
@@ -763,6 +750,11 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
 
 
 def bridges(atom_dict, sites):
+    """
+    Tried to build a function that could add bridge ligands, but gave up.
+    Just left it in here to maybe help others start, or offer some
+    schadenfreude
+    """
     couples = []
     bridge_dict = {}
     bridge_id = 0
@@ -800,9 +792,11 @@ def bridges(atom_dict, sites):
 
 
 def place_bridge_ligands(atom_dict, sites, bridge_dict, bridge_ligand):
+    """
+    See bridges()
+    """
     id = max(atom_dict) + 1
     for bridge, values in bridge_dict.items():
-        crys_val = atom_dict[values["connected"][0]]
         random_rotation = math.pi/4
         # Determine height of ligand. If bonding distance is too short, set to 0.
         # This is only correct for crystal with one kind of atom
@@ -891,4 +885,15 @@ if __name__ == "__main__":
     else:
         crystal_file = input("Crystal file to use (don't write the file extension): ") + ".xyz"
         atom_dict = crystal_reader(crystal_file)
-    builder(atom_dict)
+
+    foldername = input("Save in folder (or main): ")
+    if foldername == "main":
+        foldername = False
+    sites = tetra_sites(atom_dict)
+    # Get a series of ligands to add to crystal
+    series_b = hf.y2true(input("Add a series of ligands (y), or add them one by one(n)?: "))
+    if series_b:
+        series_lig(atom_dict, sites, foldername)
+    # Add ligands one by one
+    else:
+        single_qd(atom_dict, sites, foldername)
