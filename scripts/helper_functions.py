@@ -52,6 +52,7 @@ def check_bond_len(dict, el_a, el_b):
     if el_a in dict:
         if el_b in dict[el_a]:
             return dict[el_a][el_b]
+    print()
     print(el_a + " and " + el_b + " bond length currently unsupported. Add value to the csv file.")
     sys.exit()
 

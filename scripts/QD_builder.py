@@ -245,10 +245,13 @@ def single_qd(atom_dict, sites, foldername):
         lig_list.append(ligand_file)
         extend = hf.y2true(input("Extend ligand? Note: this replaces the last atom in the ligand file. y/n: "))
         if extend:
-            extension_list.append([input("Extend with: ") + ".xyz"])
-            extra_ext = input("Further extension to extension, or type n: ")
-            if extra_ext != 'n':
-                extension_list[-1].append(extra_ext  + ".xyz")
+                extension_list.append([input("Extend with: ") + ".xyz"])
+                while True:
+                    extra_ext = input("Further extension to extension, or type n: ")
+                    if extra_ext != 'n':
+                        extension_list[-1].append(extra_ext + ".xyz")
+                    else:
+                        break
         else:
             extension_list.append([False])
         coverage = float(input("Coverage (fraction): "))
