@@ -2,19 +2,28 @@
 
 This script either builds quantum dots from scratch, or attaches ligands to
 existing nanocrystals. Crystals are either a zincblende or diamond cube structure.
+For a global description of the building process see the dot_building_process
+pdf file.
 
 ## Usage
 
-Copy all files to a single folder and from there run
+Copy all files to a single folder, change the directory to /scripts/ and then
+run
 
 ```bash
 python QD_builder.py
 ```
 
-and enter the requested parameters.
+and enter the requested parameters. When the script asks for filenames of
+ligands, crystals or where to save the dots, don't add the file extension.
+
 
 
 ## Adding your own ligands and crystals
+To add your own nanocrystals add the crystals (.xyz files) to the
+input_crystals folder. These don't need to be centred at the origin. The script
+currently only supports zincblende and diamond cubic structures.
+
 It is possible to add your own ligands and crystals. In order to add your own
 ligands, create an .xyz file and place it in the Ligands folder. The ligand
 should be aligned along the z-axis, and the atom that connects to the quantum
@@ -31,9 +40,6 @@ wrong direction. Also, when you tell the script to 'extend' a ligand, the
 extension will replace the last atom in the file. Make sure whether this is the
 right one in a text editor.
 
-To add your own nanocrystals add the crystals to the input_crystals folder.
-These don't need to be centred at the origin. The script currently only supports
-zincblende and diamond cubic structures.
 
 Important:
 This programme needs to know the bonding lengths between different kind of

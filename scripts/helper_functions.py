@@ -47,17 +47,13 @@ def rotation_matrix(axis, theta):
                      [2 * (bd + ac), 2 * (cd - ab), aa + dd - bb - cc]])
 
 
-def bond_reader(el_a, el_b):
-    """Given 2 elements returns bonding distance from bonding_distances.csv"""
-    with open('bonding_distances.csv') as csvfile:
-        reader = csv.DictReader(csvfile)
-        for row in reader:
-            if row['Element Name'] == el_a:
-                dis = float(row[el_b])
-                csvfile.close()
-                return dis
-        print("Couldn't find distance between " + el_a + " and " + el_b + " in bonding_distances.csv. Please add manually, or use add_bond_dis2csv.py")
-        sys.exit()
+def check_bond_len(dict, el_a, el_b):
+    """ Make sure all elements are in bond_len_dict, and return the value"""
+    if el_a in dict:
+        if el_b in dict[el_a]:
+            return dict[el_a][el_b]
+    print(el_a + " and " + el_b + " bond length currently unsupported. Add value to the csv file.")
+    sys.exit()
 
 
 def csv2dict(filename):
@@ -81,7 +77,7 @@ def bond_checker(atom, dict, bond_dict):
     """Check for all atoms in bonding range"""
     bound = []
     for item, values in dict.items():
-        bond_range = bond_reader(atom[0], values["element"]) + 0.2
+        bond_range = check_bond_len(bond_dict, atom[0], values["element"]) + 0.2
         if distance_checker(atom[1:], values["coor"]) <= bond_range:
             bound.append(item)
     return bound

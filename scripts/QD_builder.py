@@ -499,7 +499,7 @@ def extend_ligand(atom_dict, lig, extension):
     # Check for atom to connect extension to, will be closest atom
     closest_atom = hf.closest_atom(lig, rep_coor)
     base_atom_el = ext[hf.base_atom(ext)]["element"]
-    init_length_ext = bond_len_dict[base_atom_el][lig[closest_atom]["element"]]
+    init_length_ext = hf.check_bond_len(bond_len_dict, base_atom_el, lig[closest_atom]["element"])
     # Remove last atom
     del lig[max(lig)]
 
@@ -619,7 +619,7 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
                 temp_atom_dict = {}
                 broken = False
                 min_dist_lig = math.inf
-                initial_length = bond_len_dict[lig[hf.base_atom(lig)]["element"]][atom_dict[loc_id]["element"]]
+                initial_length = hf.check_bond_len(bond_len_dict, lig[hf.base_atom(lig)]["element"], atom_dict[loc_id]["element"])
                 for atom, lig_val in lig.items():
                     lig_coor = copy.deepcopy(lig_val["coor"])
                     lig_coor[2] += initial_length
@@ -643,7 +643,7 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
                     # Check for overlap
                     if ligand_type != cap:
                         for test_atom, values in atom_dict.items():
-                            space = bond_len_dict[atom_element][values["element"]] + buffer
+                            space = hf.check_bond_len(bond_len_dict, atom_element, values["element"]) + buffer
                             if test_atom != loc_id:
                                 dist = hf.distance_checker(values["coor"], xyz_list[-1])
                                 if dist < space:
@@ -658,7 +658,7 @@ def place_ligands(atom_dict, lig_info, sites, buffer, fixed_loc, cap):
                             for test_lig, values in atom_dict.items():
                                 if values["type"] == "ligand":
                                     dist = hf.distance_checker(values["coor"], [c1 + c2 for c1, c2 in zip(new_pos, loc_primary_xyz)])
-                                    bond_len_loc = bond_len_dict[atom_element][values["element"]]
+                                    bond_len_loc = hf.check_bond_len(bond_len_dict, atom_element, values["element"])
                                     # Sorry for magic number
                                     if dist < bond_len_loc + 0.3:
                                         if dist < min_dist_lig:
