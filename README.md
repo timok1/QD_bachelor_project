@@ -21,9 +21,36 @@ distances are in Angstrom.
 The created quantum dots will be saved in the Created_QD folder. Here, they can
 be saved to their own folder or in the main folder.
 
+### Input parameters
+
+* **New crystal or existing**: Either build a new crystal core, or use an
+already prepared one, allowing for more customisation.
+* **Lattice Constant**: The lattice constant of the unit cells in Ångström.
+* **Diameter**: The diameter of the crystal that will be created, in unit cells.
+This means the distance from the centre of the crystal
+to the cutoff planes ((111), (110), (100)) will be half this number times the
+lattice constant. This number doesn't have to be an integer. If it's not, the
+cutoffs will go through the unit cells.
+* **Series of ligands, or one by one?**: It is possible to either build every
+QD one by one, in which case multiple ligands can be added to a single QD.
+When choosing a series, the script will make QD's with all possible combinations
+of chosen ligands and extensions. For instance if you choose *C10H21*, *C9H19* and
+*C8H17* for the bases and *COOH* and *Na* for the extensions, six QD's will be created.
+* **Filename of ligand**: Name of the file of the ligand you want to add to the
+crystal. Only type the name, not the file extension(.xyz).
+* **Filename of extension**: Same thing as with the ligand, only this time it
+adds this extension to the ligand to create a new ligand.
+* **Coverage**: Determines how many ligands will be added to the QD. This is the
+fraction of surface atoms that will have this ligand attached.
+* **Cap**: Single atom that will cap all remaining sites. Typically hydrogen.
+* **Buffer**: The distance between ligands will be at least the sum of
+*buffer* and the bonding length between the two relevant atoms. This buffer can
+be set for each QD individually.
 
 
-## Adding your own ligands and crystals
+
+
+### Adding your own ligands and crystals
 To add your own nanocrystals add the crystals (.xyz files) to the
 input_crystals folder. These don't need to be centred at the origin. The script
 currently only supports zincblende and diamond cubic structures.
